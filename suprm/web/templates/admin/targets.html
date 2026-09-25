@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Delivery targets · Admin{% endblock %}
+{% block content %}
+<h1>Delivery targets</h1>{% include "admin/_nav.html" %}
+<p class="muted">A target is anywhere you send releases: a white-label backend (FUGA, Revelator, SonoSuite...) now, or a store's own feed once you're approved. New targets start in TEST mode, so the XML is marked as a TestMessage and stores won't publish it.</p>
+<div class="card table-wrap"><table>
+  <tr><th>Name</th><th>Transport</th><th>Recipient DPID</th><th>Mode</th><th>Active</th></tr>
+  {% for t in targets %}
+  <tr><td>{{ t.name }}</td><td>{{ t.transport }}</td><td class="muted">{{ t.recipient_party_id }} · {{ t.recipient_party_name }}</td>
+    <td><form class="inline" method="post" action="/admin/targets/{{ t.id }}/toggle">{% include "_csrf.html" %}<input type="hidden" name="field" value="test_mode">
+      <button class="ghost small" {% if t.test_mode %}onclick="return confirm('Switch {{ t.name }} to LIVE? Releases sent after this will publish.')"{% endif %}>{{ 'TEST' if t.test_mode else 'LIVE' }}</button></form></td>
+    <td><form class="inline" method="post" action="/admin/targets/{{ t.id }}/toggle">{% include "_csrf.html" %}<input type="hidden" name="field" value="active">
+      <button class="ghost small">{{ 'On' if t.active else 'Off' }}</button></form></td></tr>
+  {% else %}<tr><td colspan="5" class="muted">No targets yet.</td></tr>{% endfor %}
+</table></div>
+<h2>Add target</h2>
+<div class="card">
+  <form class="stack" method="post" action="/admin/targets">
+    {% include "_csrf.html" %}
+    <div class="row">
+      <label>Name<input name="name" required placeholder="e.g. Spotify, FUGA, Local test"></label>
+      <label>Transport<select name="transport">{% for t in transports %}<option>{{ t }}</option>{% endfor %}</select></label>
+      <label>Recipient DPID<input name="recipient_party_id" required placeholder="PADPIDA..."></label>
+      <label>Recipient name<input name="recipient_party_name" required></label>
+    </div>
+    <label>Connection config (JSON)
+      <textarea name="config_json" rows="5">{"path": "./outbox/_delivered"}</textarea></label>
+    <details><summary>Config examples</summary><pre class="muted">local: {"path": "./outbox/_delivered"}
+sftp:  {"host": "sftp.store.com", "username": "suprm", "key_path": "/secrets/store_key",
+        "remote_dir": "/incoming", "host_key": "ssh-ed25519 AAAA..."}
+s3:    {"bucket": "store-dropbox", "prefix": "suprm", "region": "us-east-1"}
+http:  {"url": "https://api.backend.com/v1/deliveries", "api_key": "..."}</pre></details>
+    <div><button>Add target</button></div>
+  </form>
+</div>
+{% endblock %}

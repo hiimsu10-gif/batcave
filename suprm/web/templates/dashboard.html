@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Suprm Sounds{% endblock %}
+{% block content %}
+<h1>Hey {{ user.display_name }}</h1>
+<div class="grid">
+  <div class="card stat"><div class="label">Available balance</div><div class="value">{{ balance|money }}</div>
+    <a href="/payouts">Cash out →</a></div>
+  <div class="card stat"><div class="label">Lifetime earnings</div><div class="value">{{ lifetime|money }}</div>
+    <a href="/earnings">See breakdown →</a></div>
+  <div class="card stat"><div class="label">Releases</div><div class="value">{{ releases|length }}</div>
+    <a href="/releases/new">New release →</a></div>
+</div>
+
+<h2>Your releases</h2>
+<div class="card table-wrap">
+  {% if releases %}
+  <table>
+    <tr><th>Title</th><th>Artist</th><th>Type</th><th>Release date</th><th>UPC</th><th>Status</th></tr>
+    {% for r in releases %}
+    <tr>
+      <td><a href="/releases/{{ r.id }}">{{ r.title }}</a></td>
+      <td>{{ r.artist.name }}</td><td>{{ r.release_type.value }}</td><td>{{ r.release_date }}</td>
+      <td class="muted">{{ r.upc or '—' }}</td>
+      <td><span class="pill {{ r.status.value }}">{{ r.status.value.replace('_',' ') }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">No releases yet. <a href="/releases/new">Create your first one.</a></p>
+  {% endif %}
+</div>
+
+{% if top_stores %}
+<h2>Top stores</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Store</th><th class="num">Streams/units</th><th class="num">Earned</th></tr>
+  {% for label, amount, qty in top_stores %}
+  <tr><td>{{ label }}</td><td class="num">{{ "{:,}".format(qty) }}</td><td class="num">{{ amount|money }}</td></tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Admin · Suprm Sounds{% endblock %}
+{% block content %}
+<h1>Admin</h1>{% include "admin/_nav.html" %}
+<div class="grid">
+  <div class="card stat"><div class="label">Accounts</div><div class="value">{{ stats.artists }}</div></div>
+  <div class="card stat"><div class="label">Live releases</div><div class="value">{{ stats.live }}</div></div>
+  <div class="card stat"><div class="label">Platform commission earned</div><div class="value">{{ stats.platform_revenue|money }}</div></div>
+  <div class="card stat"><div class="label">Owed to not-yet-signed-up collaborators</div><div class="value">{{ stats.unclaimed|money }}</div></div>
+  <div class="card stat"><div class="label">Unmatched royalty lines</div><div class="value">{{ stats.unmatched }}</div></div>
+</div>
+<h2>Waiting for review ({{ in_review|length }})</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Release</th><th>Artist</th><th>Release date</th><th>Tracks</th></tr>
+  {% for r in in_review %}
+  <tr><td><a href="/admin/releases/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.artist.name }}</td><td>{{ r.release_date }}</td><td>{{ r.tracks|length }}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">Queue is empty.</td></tr>{% endfor %}
+</table></div>
+<h2>Approved, not yet delivered ({{ approved|length }})</h2>
+<div class="card table-wrap"><table>
+  {% for r in approved %}
+  <tr><td><a href="/admin/releases/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.artist.name }}</td><td>UPC {{ r.upc }}</td></tr>
+  {% else %}<tr><td class="muted">None.</td></tr>{% endfor %}
+</table></div>
+<h2>Recent deliveries</h2>
+<div class="card table-wrap"><table>
+  <tr><th>When</th><th>Release</th><th>Target</th><th>Kind</th><th>Status</th><th>Detail</th></tr>
+  {% for d in recent %}
+  <tr><td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td><a href="/admin/releases/{{ d.release_id }}">{{ d.release.title }}</a></td>
+    <td>{{ d.target.name }}</td><td>{{ d.kind.value }}</td><td><span class="pill {{ d.status.value }}">{{ d.status.value }}</span></td>
+    <td class="muted">{{ d.error or d.remote_ref or '' }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">No deliveries yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

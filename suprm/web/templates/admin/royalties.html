@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Royalty imports · Admin{% endblock %}
+{% block content %}
+<h1>Royalty imports</h1>{% include "admin/_nav.html" %}
+<div class="card">
+  <form class="stack" method="post" action="/admin/royalties" enctype="multipart/form-data">
+    {% include "_csrf.html" %}
+    <div class="row">
+      <label>Report source<input name="source" required placeholder="e.g. FUGA, Spotify, Apple"></label>
+      <label>Period<input name="period" required placeholder="2026-08"></label>
+      <label>Currency<input name="currency" value="USD" maxlength="3"></label>
+    </div>
+    <label>Report file (CSV/TSV with ISRC and revenue columns)<input type="file" name="file" required accept=".csv,.tsv,.txt"></label>
+    <div><button>Import</button></div>
+  </form>
+</div>
+<div class="card table-wrap"><table>
+  <tr><th>#</th><th>Source</th><th>Period</th><th>File</th><th class="num">Lines</th><th class="num">Unmatched</th><th class="num">Gross</th><th class="num">Matched</th></tr>
+  {% for s in statements %}
+  <tr><td><a href="/admin/royalties/{{ s.id }}">{{ s.id }}</a></td><td>{{ s.source }}</td><td>{{ s.period }}</td><td class="muted">{{ s.filename }}</td>
+    <td class="num">{{ s.line_count }}</td><td class="num">{{ s.unmatched_count }}</td><td class="num">{{ s.gross_amount|money }}</td><td class="num">{{ s.matched_amount|money }}</td></tr>
+  {% else %}<tr><td colspan="8" class="muted">No reports imported yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

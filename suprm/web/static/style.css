@@ -1,0 +1,66 @@
+:root {
+  --bg: #0d0d10; --panel: #17171c; --panel-2: #1f1f26; --line: #2c2c36;
+  --text: #f1f1f4; --muted: #9a9aa8; --brand: #c6ff3d; --brand-ink: #10130a;
+  --ok: #4ade80; --warn: #fbbf24; --err: #f87171; --radius: 12px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header.top { display: flex; align-items: center; gap: 24px; padding: 14px 24px;
+  border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+.logo { font-weight: 800; letter-spacing: .5px; font-size: 18px; color: var(--text); }
+.logo span { color: var(--brand); }
+nav { display: flex; gap: 18px; flex: 1; flex-wrap: wrap; }
+nav a { color: var(--muted); }
+nav a:hover, nav a.on { color: var(--text); text-decoration: none; }
+main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 80px; }
+h1 { font-size: 26px; margin: 0 0 18px; }
+h2 { font-size: 18px; margin: 28px 0 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px;
+  margin-bottom: 16px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.stat .label { color: var(--muted); font-size: 13px; }
+.stat .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 13px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; }
+form.stack { display: grid; gap: 12px; }
+.row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+label.check { display: flex; align-items: center; gap: 8px; }
+input, select, textarea { background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 9px 11px; font: inherit; width: 100%; }
+input[type=checkbox] { width: auto; }
+input[type=file] { padding: 7px; }
+button, .btn { background: var(--brand); color: var(--brand-ink); border: 0; border-radius: 8px; padding: 9px 16px;
+  font: inherit; font-weight: 600; cursor: pointer; display: inline-block; }
+button.ghost, .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button.danger { background: transparent; color: var(--err); border: 1px solid var(--err); }
+button.small { padding: 4px 10px; font-size: 13px; }
+.inline { display: inline; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+.pill.draft { color: var(--muted); } .pill.in_review { color: var(--warn); border-color: var(--warn); }
+.pill.approved, .pill.sent { color: var(--brand); border-color: var(--brand); }
+.pill.delivered, .pill.paid { color: var(--ok); border-color: var(--ok); }
+.pill.rejected, .pill.failed, .pill.taken_down { color: var(--err); border-color: var(--err); }
+.flash { padding: 11px 14px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--line); background: var(--panel-2); }
+.flash.success { border-color: var(--ok); } .flash.error { border-color: var(--err); } .flash.info { border-color: var(--warn); }
+ul.issues { margin: 6px 0 0; padding-left: 18px; }
+ul.issues.err li { color: var(--err); } ul.issues.warn li { color: var(--warn); }
+.muted { color: var(--muted); }
+.cover { width: 160px; height: 160px; border-radius: 10px; object-fit: cover; background: var(--panel-2);
+  border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+.release-head { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.hero { padding: 64px 0 32px; }
+.hero h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.05; margin-bottom: 16px; }
+.hero p { font-size: 18px; color: var(--muted); max-width: 640px; }
+.track { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+details summary { cursor: pointer; color: var(--brand); margin: 8px 0; }
+audio { width: 100%; max-width: 420px; }
+@media (max-width: 600px) { header.top { gap: 10px; } main { padding: 20px 16px 60px; } }
+.card > h2:first-child { margin-top: 0; }

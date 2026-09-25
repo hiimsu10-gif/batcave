@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Log in · Suprm Sounds{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px;margin:0 auto">
+  <h1>Log in</h1>
+  <form class="stack" method="post" action="/login">
+    {% include "_csrf.html" %}
+    <input type="hidden" name="next" value="{{ next or '' }}">
+    <label>Email<input type="email" name="email" required value="{{ email or '' }}"></label>
+    <label>Password<input type="password" name="password" required></label>
+    <button>Log in</button>
+  </form>
+  <p class="muted">New here? <a href="/signup">Create an account</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Earnings · Suprm Sounds{% endblock %}
+{% block content %}
+<h1>Earnings</h1>
+<div class="card stat"><div class="label">Available balance</div><div class="value">{{ balance|money }}</div></div>
+<p>Group by:
+  {% for key, label in [('store','Store'),('territory','Country'),('period','Month'),('track','Track')] %}
+    {% if key == by %}<strong>{{ label }}</strong>{% else %}<a href="?by={{ key }}">{{ label }}</a>{% endif %}{% if not loop.last %} · {% endif %}
+  {% endfor %}
+</p>
+<div class="card table-wrap">
+  {% if rows %}
+  <table>
+    <tr><th>{{ by|capitalize }}</th><th class="num">Streams/units</th><th class="num">Earned</th></tr>
+    {% for label, amount, qty in rows %}
+    <tr><td>{{ label }}</td><td class="num">{{ "{:,}".format(qty) }}</td><td class="num">{{ amount|money }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">No earnings yet. Stores report 1-3 months after your release goes live.</p>{% endif %}
+</div>
+<h2>Ledger</h2>
+<div class="card table-wrap">
+  <table>
+    <tr><th>Date</th><th>Type</th><th>Details</th><th class="num">Amount</th></tr>
+    {% for e in entries %}
+    <tr><td>{{ e.created_at.strftime('%Y-%m-%d') }}</td><td>{{ e.kind.value.replace('_',' ') }}</td>
+      <td class="muted">{{ e.memo or '' }}</td><td class="num">{{ '%.4f'|format(e.amount) }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Nothing yet.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

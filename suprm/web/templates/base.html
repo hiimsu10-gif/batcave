@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Suprm Sounds{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="/">SUPRM<span>SOUNDS</span></a>
+  <nav>
+    {% if user %}
+      <a href="/dashboard">Dashboard</a>
+      <a href="/releases/new">New release</a>
+      <a href="/earnings">Earnings</a>
+      <a href="/payouts">Payouts</a>
+      {% if user.is_admin %}<a href="/admin">Admin</a>{% endif %}
+    {% endif %}
+  </nav>
+  {% if user %}
+    <form class="inline" method="post" action="/logout">
+      <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+      <button class="ghost small">Log out</button>
+    </form>
+  {% else %}
+    <a href="/login">Log in</a> <a class="btn" href="/signup">Start releasing</a>
+  {% endif %}
+</header>
+<main>
+  {% for kind, msg in pop_flash(request) %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

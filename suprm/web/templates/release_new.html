@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}New release · Suprm Sounds{% endblock %}
+{% block content %}
+<h1>New release</h1>
+<div class="card" style="max-width:640px">
+  <form class="stack" method="post" action="/releases/new">
+    {% include "_csrf.html" %}
+    <label>Artist
+      <select name="artist_id">{% for a in user.artists %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}</select>
+    </label>
+    <label>Release title<input name="title" required></label>
+    <div class="row">
+      <label>Type<select name="release_type">{% for t in types %}<option>{{ t.value }}</option>{% endfor %}</select></label>
+      <label>Primary genre<select name="genre">{% for g in genres %}<option>{{ g }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="row">
+      <label>Release date<input type="date" name="release_date" required min="{{ today }}"></label>
+      <label>Label name (optional)<input name="label_name" placeholder="{{ label }}"></label>
+    </div>
+    <p class="muted">Tip: pick a date 3-4 weeks out. That gives stores time to ingest and lets you pitch to Spotify editorial playlists.</p>
+    <button>Create and add tracks</button>
+  </form>
+</div>
+{% endblock %}

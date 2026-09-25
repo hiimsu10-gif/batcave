@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Review {{ release.title }} · Admin{% endblock %}
+{% block content %}
+<h1>Review: {{ release.title }}</h1>{% include "admin/_nav.html" %}
+<div class="release-head">
+  {% if release.artwork_path %}<img class="cover" src="/files/artwork/{{ release.id }}" alt="Cover">{% else %}<div class="cover">No cover</div>{% endif %}
+  <div style="flex:1;min-width:260px">
+    <p><span class="pill {{ release.status.value }}">{{ release.status.value.replace('_',' ') }}</span></p>
+    <table>
+      <tr><th>Artist</th><td>{{ release.artist.name }} <span class="muted">({{ release.artist.owner.email }})</span></td></tr>
+      <tr><th>Type / genre</th><td>{{ release.release_type.value }} · {{ release.genre }}{% if release.subgenre %} / {{ release.subgenre }}{% endif %}</td></tr>
+      <tr><th>Release date</th><td>{{ release.release_date }}</td></tr>
+      <tr><th>Label</th><td>{{ release.label_name }}</td></tr>
+      <tr><th>℗ / ©</th><td>℗ {{ release.p_line_year }} {{ release.p_line }} · © {{ release.c_line_year }} {{ release.c_line }}</td></tr>
+      <tr><th>UPC</th><td>{{ release.upc or 'assigned on approval' }}</td></tr>
+      <tr><th>Territories</th><td>{{ release.territories }}</td></tr>
+    </table>
+  </div>
+</div>
+<div class="card" style="margin-top:16px">
+  {% if report.errors %}<strong>Errors</strong><ul class="issues err">{% for e in report.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  {% if report.warnings %}<strong>Warnings</strong><ul class="issues warn">{% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+  {% if report.ok and not report.warnings %}<p style="color:var(--ok)">✓ Automated QC passed. Listen to the audio and check the artwork before approving.</p>{% endif %}
+</div>
+<h2>Tracks</h2>
+<div class="card">
+  {% for t in release.tracks %}
+  <div class="{% if not loop.first %}track{% endif %}">
+    <strong>{{ t.track_number }}. {{ t.title }}{% if t.version %} ({{ t.version }}){% endif %}</strong>
+    <span class="muted">ISRC {{ t.isrc or '—' }} · {{ t.audio_codec }} · {{ t.duration_seconds }}s {% if t.explicit %}· explicit{% endif %}</span>
+    <div><audio controls preload="none" src="/files/audio/{{ t.id }}"></audio></div>
+    <div class="muted">Credits: {% for c in t.contributors %}{{ c.name }} ({{ c.role }}){% if not loop.last %}, {% endif %}{% endfor %}</div>
+    <div class="muted">Splits: {% for s in t.splits %}{{ s.email }} {{ s.percent|pct }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+  </div>
+  {% endfor %}
+</div>
+<div class="grid">
+  {% if release.status.value in ('in_review', 'rejected') %}
+  <div class="card">
+    <h2 style="margin-top:0">Approve</h2>
+    <p class="muted">Assigns a UPC and ISRCs if missing and locks the release.</p>
+    <form method="post" action="/admin/releases/{{ release.id }}/approve">{% include "_csrf.html" %}<button>Approve</button></form>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Send back</h2>
+    <form class="stack" method="post" action="/admin/releases/{{ release.id }}/reject">
+      {% include "_csrf.html" %}
+      <textarea name="notes" rows="3" required placeholder="What the artist needs to fix"></textarea>
+      <button class="danger">Reject with notes</button>
+    </form>
+  </div>
+  {% endif %}
+  {% if release.status.value in ('approved', 'delivered', 'taken_down') %}
+  <div class="card">
+    <h2 style="margin-top:0">Deliver</h2>
+    {% if targets %}
+    <form class="stack" method="post" action="/admin/releases/{{ release.id }}/deliver">
+      {% include "_csrf.html" %}
+      {% for t in targets %}
+      <label class="check"><input type="checkbox" name="target_ids" value="{{ t.id }}"> {{ t.name }} <span class="muted">({{ t.transport }}{% if t.test_mode %}, TEST{% endif %})</span></label>
+      {% endfor %}
+      <label>Message<select name="kind"><option value="insert">New release</option><option value="update">Metadata update</option><option value="takedown">Takedown</option></select></label>
+      <button>Send</button>
+    </form>
+    {% else %}<p class="muted">No delivery targets yet. <a href="/admin/targets">Add one.</a></p>{% endif %}
+  </div>
+  {% endif %}
+</div>
+<h2>Delivery history</h2>
+<div class="card table-wrap"><table>
+  <tr><th>When</th><th>Target</th><th>Kind</th><th>Status</th><th>Batch</th><th>Detail</th></tr>
+  {% for d in release.deliveries %}
+  <tr><td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ d.target.name }}</td><td>{{ d.kind.value }}</td>
+    <td><span class="pill {{ d.status.value }}">{{ d.status.value }}</span></td><td class="muted">{{ d.batch_id }}</td><td class="muted">{{ d.error or d.remote_ref or '' }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Not delivered yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

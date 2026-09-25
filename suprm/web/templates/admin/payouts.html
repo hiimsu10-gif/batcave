@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Payouts · Admin{% endblock %}
+{% block content %}
+<h1>Payouts</h1>{% include "admin/_nav.html" %}
+<div class="card">
+  <p>Total owed right now: <strong>{{ total|money }}</strong>. Make sure your Stripe balance covers it before running payouts.
+     Only artists with a connected, verified Stripe account and a balance over the minimum are paid.</p>
+  <form method="post" action="/admin/payouts/run" onsubmit="return confirm('Send Stripe transfers now?')">{% include "_csrf.html" %}<button>Run payouts</button></form>
+</div>
+<h2>Balances</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Artist</th><th>Email</th><th>Stripe</th><th class="num">Payable</th></tr>
+  {% for u, amt in owed %}
+  <tr><td>{{ u.display_name }}</td><td class="muted">{{ u.email }}</td><td>{{ 'ready' if u.payouts_enabled else 'not connected' }}</td><td class="num">{{ amt|money }}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">Nobody is owed anything.</td></tr>{% endfor %}
+</table></div>
+<h2>History</h2>
+<div class="card table-wrap"><table>
+  <tr><th>#</th><th>Date</th><th>Artist</th><th>Status</th><th>Stripe transfer</th><th class="num">Amount</th></tr>
+  {% for p in history %}
+  <tr><td>{{ p.id }}</td><td>{{ p.created_at.strftime('%Y-%m-%d') }}</td><td>{{ p.user.display_name }}</td><td><span class="pill {{ p.status.value }}">{{ p.status.value }}</span></td>
+    <td class="muted">{{ p.stripe_transfer_id or p.error or '' }}</td><td class="num">{{ p.amount|money }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">No payouts yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

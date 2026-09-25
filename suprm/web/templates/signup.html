@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Sign up · Suprm Sounds{% endblock %}
+{% block content %}
+<div class="card" style="max-width:480px;margin:0 auto">
+  <h1>Create your account</h1>
+  <form class="stack" method="post" action="/signup">
+    {% include "_csrf.html" %}
+    <label>Artist name<input name="artist_name" required value="{{ artist_name or '' }}"></label>
+    <label>Email<input type="email" name="email" required value="{{ email or '' }}"></label>
+    <label>Password (10+ characters)<input type="password" name="password" minlength="10" required></label>
+    <label>Legal name (for payouts)<input name="legal_name"></label>
+    <label>Country (2-letter code)<input name="country" value="US" maxlength="2"></label>
+    <button>Sign up</button>
+  </form>
+  <p class="muted">Already have an account? <a href="/login">Log in</a></p>
+</div>
+{% endblock %}
