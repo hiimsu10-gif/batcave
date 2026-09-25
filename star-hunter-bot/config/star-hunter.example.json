@@ -1,0 +1,57 @@
+{
+  "guildId": "PASTE_SERVER_ID",
+
+  "languages": {
+    "EN-US": { "name": "English", "flag": "🇺🇸" },
+    "ES":    { "name": "Español", "flag": "🇪🇸" }
+  },
+
+  "broadcasts": [
+    {
+      "sourceChannelId": "PASTE_STAFF_DRAFT_CHANNEL_ID",
+      "allowedRoleIds": ["PASTE_STAFF_ROLE_ID"],
+      "allowPings": false,
+      "targets": [
+        { "channelId": "PASTE_ENGLISH_ANNOUNCEMENTS_CHANNEL_ID", "lang": "EN-US" },
+        { "channelId": "PASTE_SPANISH_ANNOUNCEMENTS_CHANNEL_ID", "lang": "ES" }
+      ]
+    }
+  ],
+
+  "mirrors": [
+    { "fromChannelId": "PASTE_GENERAL_CHANNEL_ID", "toChannelId": "PASTE_GENERAL_ES_CHANNEL_ID", "lang": "ES" }
+  ],
+
+  "onboarding": {
+    "color": 16106776,
+    "welcomeChannelId": "PASTE_WELCOME_CHANNEL_ID",
+    "rulesChannelId": "PASTE_RULES_CHANNEL_ID",
+    "memberRoleId": "PASTE_MEMBER_ROLE_ID",
+    "welcomeTitle": "⭐ Welcome to Star Hunter | Last Order!",
+    "welcomeMessage": "Hey {user}, welcome, hunter! You're member **#{count}**.\n\n1️⃣ Read and accept the rules in {rules}\n2️⃣ Pick your language and roles in {roles}\n3️⃣ Say hi and find a squad!",
+    "dmMessage": "Welcome to **{server}**, {name}! Head to {rules} and click **I agree** to unlock the server. 🌟",
+    "bannerUrl": "",
+    "rulesTitle": "📜 Star Hunter | Last Order: Rules",
+    "agreeLabel": "I agree, let me in",
+    "rules": [
+      "Be respectful. No harassment, hate speech, or personal attacks.",
+      "No cheating, exploits, or selling accounts/items.",
+      "Keep channels on topic. Use the right channel for LFG, trading, and bugs.",
+      "No spam or self-promotion without staff permission.",
+      "English and Spanish are both welcome. Use the translated channels to talk across languages.",
+      "Staff decisions are final. Open a ticket if you have a problem."
+    ],
+    "rolePicker": {
+      "channelId": "PASTE_ROLES_CHANNEL_ID",
+      "title": "🎭 Pick your roles",
+      "description": "Choose your language so you see the right channels, then tell us how you play. Click again to remove a role.",
+      "roles": [
+        { "roleId": "PASTE_ENGLISH_ROLE_ID", "label": "English", "emoji": "🇺🇸" },
+        { "roleId": "PASTE_SPANISH_ROLE_ID", "label": "Español", "emoji": "🇪🇸" },
+        { "roleId": "PASTE_PVP_ROLE_ID", "label": "PvP", "emoji": "⚔️" },
+        { "roleId": "PASTE_PVE_ROLE_ID", "label": "PvE", "emoji": "🛡️" },
+        { "roleId": "PASTE_EVENTS_ROLE_ID", "label": "Event pings", "emoji": "📣" }
+      ]
+    }
+  }
+}
