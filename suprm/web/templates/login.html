@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Log In · Suprm Sounds{% endblock %}
+{% block wintitle %}Log In{% endblock %}
+{% block content %}
+<div class="dialog">
+  <h1>Welcome back</h1>
+  <form class="stack" method="post" action="/login">
+    {% include "_csrf.html" %}
+    <input type="hidden" name="next" value="{{ next or '' }}">
+    <label>Email<input id="email" type="email" name="email" required value="{{ email or '' }}" autocomplete="email"></label>
+    <label>Password<input id="password" type="password" name="password" required autocomplete="current-password"></label>
+    <button>Log in</button>
+  </form>
+  <p class="muted" style="margin-top:14px"><a href="/forgot">Forgot your password?</a> · New here? <a href="/signup">Create an account</a></p>
+</div>
+{% endblock %}

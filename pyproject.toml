@@ -1,0 +1,41 @@
+[project]
+name = "suprm-sounds"
+version = "0.1.0"
+description = "Suprm Sounds - artist-first music distribution platform"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "sqlalchemy>=2.0",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "itsdangerous>=2.1",
+    "lxml>=5.0",
+    "stripe>=9.0",
+    "paramiko>=3.4",
+    "boto3>=1.34",
+    "httpx>=0.27",
+    "alembic>=1.13",
+    "qrcode>=7.4",
+    "markdown>=3.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+postgres = ["psycopg[binary]>=3.1"]
+
+[project.scripts]
+suprm = "suprm.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["suprm*"]
+
+[tool.setuptools.package-data]
+suprm = ["web/templates/*.html", "web/templates/admin/*.html", "web/static/*", "legal/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

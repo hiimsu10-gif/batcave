@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Two-Factor Code · Suprm Sounds{% endblock %}
+{% block content %}
+<div class="dialog">
+  <h1>Enter your code</h1>
+  <p class="muted">Open your authenticator app and type the 6-digit code for Suprm Sounds.</p>
+  <form class="stack" method="post" action="/login/2fa">
+    {% include "_csrf.html" %}
+    <label>Code<input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required autofocus class="mono"></label>
+    <button>Verify</button>
+  </form>
+</div>
+{% endblock %}

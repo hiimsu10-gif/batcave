@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Statement {{ st.id }} · Admin{% endblock %}
+{% block content %}
+<h1>{{ st.source }} · {{ st.period }}</h1>{% include "admin/_nav.html" %}
+<div class="grid">
+  <div class="card stat"><div class="label">Gross</div><div class="value">{{ st.gross_amount|money }}</div></div>
+  <div class="card stat"><div class="label">Matched to your catalog</div><div class="value">{{ st.matched_amount|money }}</div></div>
+  <div class="card stat"><div class="label">Lines waiting to allocate</div><div class="value">{{ pending }}</div>
+    <form method="post" action="/admin/royalties/{{ st.id }}/allocate">{% include "_csrf.html" %}<button {% if not pending %}disabled{% endif %}>Allocate to artists</button></form></div>
+</div>
+<h2>Unmatched lines ({{ st.unmatched_count }})</h2>
+<p class="muted">These ISRCs aren't in your catalog. Money on them stays unallocated until you add the track (or fix its ISRC) and click Allocate again.</p>
+<div class="card table-wrap"><table>
+  <tr><th>ISRC</th><th>UPC</th><th>Store</th><th>Territory</th><th class="num">Qty</th><th class="num">Amount</th></tr>
+  {% for l in unmatched %}
+  <tr><td>{{ l.isrc or '—' }}</td><td>{{ l.upc or '—' }}</td><td>{{ l.store }}</td><td>{{ l.territory or '' }}</td><td class="num">{{ l.quantity }}</td><td class="num">{{ '%.6f'|format(l.amount) }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Everything matched.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

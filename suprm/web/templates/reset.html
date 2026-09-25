@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}New Password · Suprm Sounds{% endblock %}
+{% block content %}
+<div class="dialog">
+  <h1>Choose a new password</h1>
+  <form class="stack" method="post" action="/reset/{{ token }}">
+    {% include "_csrf.html" %}
+    <label>New password (10+ characters)<input id="password" type="password" name="password" minlength="10" required autocomplete="new-password"></label>
+    <button>Save password</button>
+  </form>
+</div>
+{% endblock %}

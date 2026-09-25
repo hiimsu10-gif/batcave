@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}{{ release.title }} · Suprm Sounds{% endblock %}
+{% block content %}
+<div class="release-head">
+  {% if release.artwork_path %}<img class="cover" src="/files/artwork/{{ release.id }}" alt="Cover art">
+  {% else %}<div class="cover">No cover art</div>{% endif %}
+  <div style="flex:1;min-width:240px">
+    <h1 style="margin-bottom:6px">{{ release.title }}{% if release.version %} ({{ release.version }}){% endif %}</h1>
+    <div class="muted">{{ release.artist.name }} · {{ release.release_type.value }} · {{ release.release_date }}
+      {% if release.upc %}· UPC {{ release.upc }}{% endif %}</div>
+    <p><span class="pill {{ release.status.value }}">{{ release.status.value.replace('_',' ') }}</span></p>
+    {% if release.review_notes %}<div class="flash error"><strong>Review notes:</strong> {{ release.review_notes }}</div>{% endif %}
+    {% if editable %}
+    <form method="post" action="/releases/{{ release.id }}/artwork" enctype="multipart/form-data" class="row" style="align-items:end">
+      {% include "_csrf.html" %}
+      <label>Cover art (3000×3000 JPEG/PNG)<input type="file" name="file" accept="image/jpeg,image/png" required></label>
+      <div><button class="ghost">Upload cover</button></div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px">
+  <h2 style="margin-top:0">Pre-flight check</h2>
+  {% if report.ok and not report.warnings %}<p style="color:var(--ok)">✓ Ready for stores.</p>{% endif %}
+  {% if report.errors %}<strong>Must fix</strong><ul class="issues err">{% for e in report.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  {% if report.warnings %}<strong>Store style guide</strong><ul class="issues warn">{% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+  {% if editable %}
+  <form method="post" action="/releases/{{ release.id }}/submit" style="margin-top:14px">
+    {% include "_csrf.html" %}
+    <button {% if not report.ok %}disabled title="Fix the errors first"{% endif %}>Submit for distribution</button>
+  </form>
+  {% endif %}
+</div>
+
+<h2>Tracks</h2>
+<div class="card">
+  {% for t in release.tracks %}
+  <div class="{% if not loop.first %}track{% endif %}">
+    <strong>{{ t.track_number }}. {{ t.title }}{% if t.version %} ({{ t.version }}){% endif %}</strong>
+    {% if t.explicit %}<span class="pill">E</span>{% endif %}
+    <span class="muted">{{ t.audio_codec or '' }} · {{ (t.duration_seconds or 0) // 60 }}:{{ '%02d' % ((t.duration_seconds or 0) % 60) }}
+      {% if t.isrc %}· ISRC {{ t.isrc }}{% endif %}</span>
+    {% if t.audio_path %}<div><audio controls preload="none" src="/files/audio/{{ t.id }}"></audio></div>{% endif %}
+
+    <div class="row" style="margin-top:10px">
+      <div>
+        <div class="muted">Credits</div>
+        <ul style="margin:4px 0;padding-left:18px">
+        {% for c in t.contributors %}
+          <li>{{ c.name }} <span class="muted">({{ c.role }})</span>
+          {% if editable %}<form class="inline" method="post" action="/contributors/{{ c.id }}/delete">{% include "_csrf.html" %}<button class="ghost small">×</button></form>{% endif %}</li>
+        {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <div class="muted">Royalty splits</div>
+        <ul style="margin:4px 0;padding-left:18px">
+        {% for s in t.splits %}
+          <li>{{ s.email }} — {{ s.percent|pct }}{% if not s.user_id %} <span class="muted">(invited)</span>{% endif %}
+          {% if editable %}<form class="inline" method="post" action="/splits/{{ s.id }}/delete">{% include "_csrf.html" %}<button class="ghost small">×</button></form>{% endif %}</li>
+        {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    {% if editable %}
+    <details><summary>Edit track, credits and splits</summary>
+      <form class="row" method="post" action="/tracks/{{ t.id }}" style="align-items:end">
+        {% include "_csrf.html" %}
+        <label>Title<input name="title" value="{{ t.title }}" required></label>
+        <label>Version<input name="version" value="{{ t.version or '' }}" placeholder="e.g. Remix"></label>
+        <label>ISRC (leave blank and we'll assign one)<input name="isrc" value="{{ t.isrc or '' }}"></label>
+        <label class="check"><input type="checkbox" name="explicit" value="true" {% if t.explicit %}checked{% endif %}> Explicit</label>
+        <div><button class="ghost">Save track</button></div>
+      </form>
+      <form class="row" method="post" action="/tracks/{{ t.id }}/contributors" style="align-items:end;margin-top:10px">
+        {% include "_csrf.html" %}
+        <label>Credit name<input name="name" required></label>
+        <label>Role<select name="role">{% for r in roles %}<option>{{ r }}</option>{% endfor %}</select></label>
+        <div><button class="ghost">Add credit</button></div>
+      </form>
+      <form class="row" method="post" action="/tracks/{{ t.id }}/splits" style="align-items:end;margin-top:10px">
+        {% include "_csrf.html" %}
+        <label>Payee email<input type="email" name="email" required></label>
+        <label>Percent<input name="percent" inputmode="decimal" required placeholder="50"></label>
+        <div><button class="ghost">Add / update split</button></div>
+      </form>
+      <form method="post" action="/tracks/{{ t.id }}/delete" style="margin-top:10px">
+        {% include "_csrf.html" %}<button class="danger small">Remove track</button>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="muted">No tracks yet.</p>
+  {% endfor %}
+</div>
+
+{% if editable %}
+<h2>Add a track</h2>
+<div class="card">
+  <form class="stack" method="post" action="/releases/{{ release.id }}/tracks" enctype="multipart/form-data">
+    {% include "_csrf.html" %}
+    <div class="row">
+      <label>Title<input name="title" required></label>
+      <label>Version (optional)<input name="version" placeholder="e.g. Remix, Radio Edit"></label>
+      <label>Songwriter(s)<input name="songwriter" placeholder="Legal name, required by stores"></label>
+      <label>ISRC (optional)<input name="isrc" placeholder="Leave blank to auto-assign"></label>
+    </div>
+    <label>Audio (WAV or FLAC, 16/24-bit, 44.1kHz+, stereo)<input type="file" name="file" accept=".wav,.flac,audio/wav,audio/flac" required></label>
+    <label class="check"><input type="checkbox" name="explicit" value="true"> Explicit lyrics</label>
+    <div><button>Upload track</button></div>
+  </form>
+</div>
+
+<h2>Release details</h2>
+<div class="card">
+  <form class="stack" method="post" action="/releases/{{ release.id }}">
+    {% include "_csrf.html" %}
+    <div class="row">
+      <label>Title<input name="title" value="{{ release.title }}" required></label>
+      <label>Version<input name="version" value="{{ release.version or '' }}" placeholder="e.g. Deluxe"></label>
+      <label>Type<select name="release_type">{% for t in types %}<option {% if t == release.release_type %}selected{% endif %}>{{ t.value }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="row">
+      <label>Genre<select name="genre">{% for g in genres %}<option {% if g == release.genre %}selected{% endif %}>{{ g }}</option>{% endfor %}</select></label>
+      <label>Subgenre<input name="subgenre" value="{{ release.subgenre or '' }}"></label>
+      <label>Language (ISO code)<input name="language" value="{{ release.language }}"></label>
+    </div>
+    <div class="row">
+      <label>Release date<input type="date" name="release_date" value="{{ release.release_date }}" required></label>
+      <label>Original release date (re-releases only)<input type="date" name="original_release_date" value="{{ release.original_release_date or '' }}"></label>
+      <label>UPC (only if you already have one)<input name="upc" value="{{ release.upc or '' }}"></label>
+    </div>
+    <div class="row">
+      <label>Label<input name="label_name" value="{{ release.label_name }}" required></label>
+      <label>℗ Sound recording owner<input name="p_line" value="{{ release.p_line }}" required></label>
+      <label>© Artwork/composition owner<input name="c_line" value="{{ release.c_line }}" required></label>
+    </div>
+    <label>Territories ("Worldwide" or comma-separated country codes)<input name="territories" value="{{ release.territories }}"></label>
+    <label class="check"><input type="checkbox" name="explicit" value="true" {% if release.explicit %}checked{% endif %}> Explicit release</label>
+    <div><button class="ghost">Save details</button></div>
+  </form>
+</div>
+{% if release.status.value == 'draft' %}
+<form method="post" action="/releases/{{ release.id }}/delete" onsubmit="return confirm('Delete this draft?')">
+  {% include "_csrf.html" %}<button class="danger small">Delete draft</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}

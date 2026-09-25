@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Suprm Sounds{% endblock %}
+{% block content %}
+<nav class="legal-tabs" aria-label="Policies">
+  {% for key, name in pages.items() %}<a href="/legal/{{ key }}" {% if key == slug %}class="on" aria-current="page"{% endif %}>{{ name }}</a>{% endfor %}
+</nav>
+<article class="doc">{{ body }}</article>
+{% endblock %}

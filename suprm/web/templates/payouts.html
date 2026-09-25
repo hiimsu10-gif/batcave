@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Payouts · Suprm Sounds{% endblock %}
+{% block content %}
+<h1>Payouts</h1>
+<div class="grid">
+  <div class="card stat"><div class="label">Ready to pay out</div><div class="value">{{ payable|money }}</div>
+    <div class="muted">Paid in the next payout run once your balance reaches {{ minimum|money }}.</div></div>
+  <div class="card">
+    {% if user.payouts_enabled %}
+      <p style="color:var(--ok)">✓ Payout account connected</p>
+      <form method="post" action="/payouts/dashboard">{% include "_csrf.html" %}<button class="ghost">Open Stripe dashboard</button></form>
+    {% else %}
+      <p>Connect a payout account to get paid. Stripe verifies your identity, collects your bank details and tax info (W-9/W-8). We never see your bank or SSN.</p>
+      <form method="post" action="/payouts/connect">{% include "_csrf.html" %}<button>{% if user.stripe_account_id %}Finish Stripe setup{% else %}Connect payout account{% endif %}</button></form>
+    {% endif %}
+  </div>
+</div>
+<h2>History</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Date</th><th>Status</th><th class="num">Amount</th></tr>
+  {% for p in history %}
+  <tr><td>{{ p.created_at.strftime('%Y-%m-%d') }}</td><td><span class="pill {{ p.status.value }}">{{ p.status.value }}</span></td><td class="num">{{ p.amount|money }}</td></tr>
+  {% else %}<tr><td colspan="3" class="muted">No payouts yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}
