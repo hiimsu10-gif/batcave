@@ -68,7 +68,7 @@ both just a **delivery target**.
 ## 3. Launch checklist (Phase 0: before the first artist)
 
 Business and identity:
-- [ ] **Entity.** An LLC or corporation for Suprm Sounds, with an EIN. If you have a holding company, ask your attorney how this should sit under it.
+- [x] **Entity.** Suprm Sounds is registered, with an EIN.
 - [ ] **Business bank account** (e.g. Mercury), where store and backend royalties land.
 - [ ] **Stripe account** with Connect enabled, using the Express account type. In test mode, run the full flow first.
 - [ ] **DDEX Party ID (DPID).** Free; request it at dpid.ddex.net. Put it in `DDEX_PARTY_ID`.
@@ -148,15 +148,24 @@ Ideas for the roadmap:
 
 ## 7. Technical to-do before real artists and money
 
+Done:
+- [x] Postgres support with Alembic migrations (`suprm migrate`), tested on Postgres 16
+- [x] Media on S3 or Cloudflare R2 (`STORAGE_BACKEND=s3`) with private, short-lived download links
+- [x] Password reset and email verification (console, SMTP or Resend)
+- [x] Background worker for deliveries (`suprm worker`), with retries and backoff
+- [x] Two-factor login (TOTP), required for admins
+- [x] Legal pages, with acceptance recorded at sign-up (`LEGAL_VERSION`)
+
+Still to do:
+
 | Priority | Item |
 |---|---|
-| Must | Postgres in production (`DATABASE_URL=postgresql+psycopg://...`) plus Alembic migrations |
-| Must | Media on S3 or Cloudflare R2 instead of local disk; HTTPS; a real random `SECRET_KEY` |
-| Must | Password reset and email verification (email provider, e.g. Postmark or Resend) |
-| Must | Background worker for deliveries and imports (big WAV albums are slow to upload) |
 | Must | Validate ERN output with DDEX Workbench and your backend's spec before going LIVE |
-| Should | 2FA for admin accounts, and an audit log of admin actions |
+| Must | Attorney review of the four legal drafts in `suprm/legal/` |
 | Should | Vendor-specific backend adapter once you've picked one |
+| Should | Audit log of admin actions |
 | Should | DDEX ACK processing and DSR parser (Phase 2) |
 | Should | Multi-currency reports (convert to USD at statement FX rate on import) |
 | Nice | Loudness and silence checks on audio (ffmpeg), artwork text/logo checks |
+
+The step-by-step setup (IDs, Stripe, backend outreach emails, hosting) is in [`SETUP_GUIDE.md`](SETUP_GUIDE.md).

@@ -13,6 +13,10 @@ class LoginRequired(Exception):
     pass
 
 
+class TwoFactorSetupRequired(Exception):
+    pass
+
+
 def db(session: Session = Depends(get_session)) -> Session:
     return session
 
@@ -27,8 +31,12 @@ def current_user(request: Request, session: Session = Depends(db)) -> User:
 
 
 def admin_user(user: User = Depends(current_user)) -> User:
+    from ..config import settings
+
     if not user.is_admin:
         raise HTTPException(403, "Admins only")
+    if settings.require_admin_2fa and not user.totp_enabled:
+        raise TwoFactorSetupRequired()
     return user
 
 

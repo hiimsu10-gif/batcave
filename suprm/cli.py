@@ -1,6 +1,8 @@
 """Admin command line.
 
-    suprm init-db
+    suprm init-db                # local SQLite: create tables
+    suprm migrate                # Postgres/production: apply migrations
+    suprm worker                 # background worker for deliveries (keep it running)
     suprm create-admin you@suprmsounds.com
     suprm add-target "Local test" local --party-id PADPIDA0000000000T --party-name "Test Store" \
         --config '{"path": "./outbox/_delivered"}'
@@ -26,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="suprm")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init-db")
+    sub.add_parser("migrate")
+    w = sub.add_parser("worker")
+    w.add_argument("--once", action="store_true", help="run queued jobs then exit")
     a = sub.add_parser("create-admin")
     a.add_argument("email")
     a.add_argument("--name", default="Suprm Admin")
@@ -50,10 +55,35 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("run-payouts")
     args = p.parse_args(argv)
 
-    init_db()
+    if args.cmd == "migrate":
+        from .migrate import upgrade
+
+        upgrade()
+        print("Migrations applied")
+        return 0
+    if args.cmd == "worker":
+        import logging
+
+        from .jobs import run_pending, work_forever
+
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        if args.once:
+            with SessionLocal() as s:
+                print(f"Ran {run_pending(s)} jobs")
+        else:
+            work_forever(SessionLocal)
+        return 0
+
+    from .config import settings
+
+    if settings.is_sqlite:
+        init_db()
     session = SessionLocal()
     try:
         if args.cmd == "init-db":
+            if not settings.is_sqlite:
+                print("For Postgres, run `suprm migrate` instead", file=sys.stderr)
+                return 1
             print("Database ready")
         elif args.cmd == "create-admin":
             from .security import hash_password

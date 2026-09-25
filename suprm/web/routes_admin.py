@@ -8,7 +8,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..delivery.service import DeliveryError, approve_release, deliver
+from ..delivery.service import DeliveryError, approve_release, queue_delivery
 from ..delivery.transports import TRANSPORTS
 from ..models import (
     Delivery,
@@ -89,11 +89,13 @@ def deliver_release(release_id: int, request: Request, target_ids: list[int] = F
         if not target:
             continue
         try:
-            d = deliver(session, release, target, kind)
+            d = queue_delivery(session, release, target, kind)
             if d.status.value == "failed":
                 flash(request, f"{target.name}: failed - {d.error}", "error")
-            else:
+            elif d.status.value == "sent":
                 flash(request, f"{target.name}: {kind.value} sent ({d.remote_ref})", "success")
+            else:
+                flash(request, f"{target.name}: {kind.value} queued. The worker will send it shortly.", "success")
         except (DeliveryError, ValueError) as exc:
             session.rollback()
             flash(request, f"{target.name}: {exc}", "error")

@@ -1,17 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Sign up · Suprm Sounds{% endblock %}
+{% block title %}Sign Up · Suprm Sounds{% endblock %}
+{% block wintitle %}New Account{% endblock %}
 {% block content %}
-<div class="card" style="max-width:480px;margin:0 auto">
+<div class="dialog">
   <h1>Create your account</h1>
   <form class="stack" method="post" action="/signup">
     {% include "_csrf.html" %}
-    <label>Artist name<input name="artist_name" required value="{{ artist_name or '' }}"></label>
-    <label>Email<input type="email" name="email" required value="{{ email or '' }}"></label>
-    <label>Password (10+ characters)<input type="password" name="password" minlength="10" required></label>
-    <label>Legal name (for payouts)<input name="legal_name"></label>
-    <label>Country (2-letter code)<input name="country" value="US" maxlength="2"></label>
-    <button>Sign up</button>
+    <label>Artist name<input id="artist_name" name="artist_name" required value="{{ artist_name or '' }}"></label>
+    <label>Email<input id="email" type="email" name="email" required value="{{ email or '' }}" autocomplete="email"></label>
+    <label>Password (10+ characters)<input id="password" type="password" name="password" minlength="10" required autocomplete="new-password"></label>
+    <div class="row">
+      <label>Legal name (for payouts)<input id="legal_name" name="legal_name" value="{{ legal_name or '' }}"></label>
+      <label>Country code<input id="country" name="country" value="{{ country or 'US' }}" maxlength="2"></label>
+    </div>
+    <label class="check"><input id="accept_terms" type="checkbox" name="accept_terms" value="true" required>
+      <span>I agree to the <a href="/legal/terms" target="_blank">Terms</a>, the <a href="/legal/artist-agreement" target="_blank">Artist Distribution Agreement</a>, the <a href="/legal/content-policy" target="_blank">Content &amp; Fraud Policy</a> and the <a href="/legal/privacy" target="_blank">Privacy Policy</a>.</span></label>
+    <button>Create account</button>
   </form>
-  <p class="muted">Already have an account? <a href="/login">Log in</a></p>
+  <p class="muted" style="margin-top:14px">Already have an account? <a href="/login">Log in</a></p>
 </div>
 {% endblock %}

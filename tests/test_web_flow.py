@@ -7,7 +7,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from suprm import email, totp
 from suprm.config import settings
+from suprm.db import SessionLocal
+from suprm.jobs import run_pending
 from suprm.models import Delivery, Payout, Release, Role, User
 from suprm.security import hash_password
 from suprm.web import routes_payouts
@@ -23,7 +26,7 @@ def csrf(client, path):
 
 @pytest.fixture
 def client():
-    with TestClient(create_app(create_tables=False)) as c:
+    with TestClient(create_app(create_tables=False), base_url=settings.base_url) as c:
         yield c
 
 
@@ -49,9 +52,14 @@ def test_full_artist_journey(client, session, tmp_path, monkeypatch):
 
     # --- artist signs up
     token = csrf(client, "/signup")
-    r = client.post("/signup", data={"csrf": token, "email": "nova@example.com", "password": "supersecret1",
-                                     "artist_name": "Nova Kai", "country": "US"})
+    signup = {"csrf": token, "email": "nova@example.com", "password": "supersecret1",
+              "artist_name": "Nova Kai", "country": "US"}
+    r = client.post("/signup", data=signup)
+    assert "Please accept the Terms" in r.text  # terms are required
+    r = client.post("/signup", data={**signup, "accept_terms": "true"})
     assert r.status_code == 200 and "Hey Nova Kai" in r.text
+    nova = session.scalar(select(User).where(User.email == "nova@example.com"))
+    assert nova.terms_version == settings.legal_version
 
     # --- creates a release
     token = csrf(client, "/releases/new")
@@ -88,7 +96,11 @@ def test_full_artist_journey(client, session, tmp_path, monkeypatch):
                                                        "percent": "30"})
     assert "beats@example.com" in r.text and "(invited)" in r.text
 
-    # --- submits
+    # --- can't submit until the email is confirmed
+    r = client.post(f"{page}/submit", data={"csrf": csrf(client, page)})
+    assert "Confirm your email first" in r.text
+    link = re.search(r"http://\S+/verify/(\S+)", email.SENT[-1]["text"]).group(0)
+    assert "Email confirmed" in client.get(link.replace(settings.base_url, "")).text
     r = client.post(f"{page}/submit", data={"csrf": csrf(client, page)})
     assert "Submitted!" in r.text
 
@@ -105,6 +117,14 @@ def test_full_artist_journey(client, session, tmp_path, monkeypatch):
     client.post("/logout", data={"csrf": csrf(client, "/dashboard")})
     client.post("/login", data={"csrf": csrf(client, "/login"), "email": "admin@suprm.test",
                                 "password": "adminpassword"})
+    # --- admins must turn on two-factor login before using the console
+    r = client.get("/admin")
+    assert r.url.path == "/account" and "Admins need two-factor login" in r.text
+    admin = session.scalar(select(User).where(User.email == "admin@suprm.test"))
+    session.refresh(admin)
+    r = client.post("/account/2fa/enable", data={"csrf": csrf(client, "/account"),
+                                                 "code": totp.current_code(admin.totp_secret)})
+    assert "Two-factor login is on" in r.text
     assert "Waiting for review (1)" in client.get("/admin").text
 
     client.post("/admin/targets", data={"csrf": csrf(client, "/admin/targets"), "name": "Local test",
@@ -117,8 +137,12 @@ def test_full_artist_journey(client, session, tmp_path, monkeypatch):
     target_id = re.search(r'name="target_ids" value="(\d+)"', r.text).group(1)
     r = client.post(f"{review}/deliver", data={"csrf": csrf(client, review), "target_ids": target_id,
                                                "kind": "insert"})
-    assert "Local test: insert sent" in r.text
+    assert "Local test: insert queued" in r.text
+    with SessionLocal() as worker_session:  # what `suprm worker` does
+        assert run_pending(worker_session) == 1
     delivery = session.scalar(select(Delivery))
+    session.refresh(delivery)
+    assert delivery.status.value == "sent", delivery.error
     session.refresh(release)
     assert release.status.value == "delivered"
     delivered = tmp_path / "delivered" / delivery.batch_id
@@ -146,8 +170,13 @@ def test_full_artist_journey(client, session, tmp_path, monkeypatch):
     assert "Payout account connected" in client.get("/payouts/return").text
 
     client.post("/logout", data={"csrf": csrf(client, "/dashboard")})
-    client.post("/login", data={"csrf": csrf(client, "/login"), "email": "admin@suprm.test",
-                                "password": "adminpassword"})
+    r = client.post("/login", data={"csrf": csrf(client, "/login"), "email": "admin@suprm.test",
+                                    "password": "adminpassword"})
+    assert r.url.path == "/login/2fa"
+    r = client.post("/login/2fa", data={"csrf": csrf(client, "/login/2fa"), "code": "000000"})
+    assert "That code didn" in r.text
+    client.post("/login/2fa", data={"csrf": csrf(client, "/login/2fa"),
+                                    "code": totp.current_code(admin.totp_secret)})
     r = client.post("/admin/payouts/run", data={"csrf": csrf(client, "/admin/payouts")})
     assert "Paid 1 artists ($112.00)" in r.text
     assert session.scalar(select(Payout)).amount == Decimal("112.00")
@@ -155,7 +184,7 @@ def test_full_artist_journey(client, session, tmp_path, monkeypatch):
     # --- the producer signs up later and finds their 30% waiting
     client.post("/logout", data={"csrf": csrf(client, "/admin")})
     r = client.post("/signup", data={"csrf": csrf(client, "/signup"), "email": "beats@example.com",
-                                     "password": "producerpass1", "artist_name": "Beatz"})
+                                     "password": "producerpass1", "artist_name": "Beatz", "accept_terms": "true"})
     assert "$48.00" in r.text
 
 
@@ -172,3 +201,38 @@ def test_media_is_private(client, session, tmp_path):
     assert client.get(f"/files/artwork/{release.id}").status_code == 404
     assert client.get(f"/releases/{release.id}").status_code == 404
     assert settings.media_root.exists()
+
+
+def test_password_reset(client, session):
+    from .factories import make_user
+
+    make_user(session, email="reset@example.com")
+    session.commit()
+    r = client.post("/forgot", data={"csrf": csrf(client, "/forgot"), "email": "reset@example.com"})
+    assert "reset link is on its way" in r.text
+    # Unknown emails get the same answer and no email
+    sent = len(email.SENT)
+    client.post("/forgot", data={"csrf": csrf(client, "/forgot"), "email": "nobody@example.com"})
+    assert len(email.SENT) == sent
+    path = re.search(r"http://\S+(/reset/\S+)", email.SENT[-1]["text"]).group(1)
+    r = client.post(path, data={"csrf": csrf(client, path), "password": "brand-new-password"})
+    assert "Password updated" in r.text
+    # The link is single-use: it dies once the password changes
+    assert client.get(path).url.path == "/forgot"
+    r = client.post("/login", data={"csrf": csrf(client, "/login"), "email": "reset@example.com",
+                                    "password": "brand-new-password"})
+    assert r.url.path == "/dashboard"
+
+
+def test_legal_pages_render_with_company_details(client):
+    for slug in ("terms", "artist-agreement", "privacy", "content-policy"):
+        r = client.get(f"/legal/{slug}")
+        assert r.status_code == 200
+        assert settings.legal_entity_name in r.text
+        assert "{{" not in r.text
+    assert client.get("/legal/nope").status_code == 404
+
+
+def test_home_page(client):
+    r = client.get("/")
+    assert "Suprm FM" in r.text and "Split Calculator" in r.text and "/legal/terms" in r.text

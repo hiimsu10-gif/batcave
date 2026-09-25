@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Reset Password · Suprm Sounds{% endblock %}
+{% block content %}
+<div class="dialog">
+  <h1>Forgot your password?</h1>
+  <p class="muted">Enter your email and we'll send you a link to set a new one. The link works for 1 hour.</p>
+  <form class="stack" method="post" action="/forgot">
+    {% include "_csrf.html" %}
+    <label>Email<input id="email" type="email" name="email" required autocomplete="email"></label>
+    <button>Send reset link</button>
+  </form>
+</div>
+{% endblock %}

@@ -2,34 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Suprm Sounds{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Karla:wght@400;500;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header class="top">
-  <a class="logo" href="/">SUPRM<span>SOUNDS</span></a>
-  <nav>
-    {% if user %}
-      <a href="/dashboard">Dashboard</a>
-      <a href="/releases/new">New release</a>
-      <a href="/earnings">Earnings</a>
-      <a href="/payouts">Payouts</a>
-      {% if user.is_admin %}<a href="/admin">Admin</a>{% endif %}
-    {% endif %}
-  </nav>
+<header class="menubar">
+  <a class="brand" href="/"><span class="sun">&#10058;</span> Suprm Sounds</a>
   {% if user %}
-    <form class="inline" method="post" action="/logout">
+    <a href="/dashboard">Desktop</a>
+    <a href="/releases/new">New Release</a>
+    <a href="/earnings">Earnings</a>
+    <a href="/payouts">Payouts</a>
+    <a href="/account">Account</a>
+    {% if user.is_admin %}<a href="/admin">Admin</a>{% endif %}
+  {% endif %}
+  <span class="spacer"></span>
+  {% if user %}
+    <form method="post" action="/logout">
       <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
-      <button class="ghost small">Log out</button>
+      <button class="menu-link">Log Out</button>
     </form>
   {% else %}
-    <a href="/login">Log in</a> <a class="btn" href="/signup">Start releasing</a>
+    <a href="/login">Log In</a>
+    <a href="/signup">Sign Up</a>
   {% endif %}
+  <span class="clock" id="clock" aria-hidden="true"></span>
 </header>
-<main>
-  {% for kind, msg in pop_flash(request) %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}
-  {% block content %}{% endblock %}
+
+{% block desktop %}
+<main class="desktop">
+  <section class="window main-window">
+    <div class="titlebar"><span class="box close"></span><span class="title">{% block wintitle %}{{ self.title()|replace(' · Suprm Sounds', '')|replace('Suprm Sounds', 'Suprm OS') }}{% endblock %}</span><span class="box"></span></div>
+    <div class="window-body">
+      {% for kind, msg in pop_flash(request) %}<div class="flash {{ kind }}" role="status">{{ msg }}</div>{% endfor %}
+      {% block content %}{% endblock %}
+    </div>
+  </section>
+  {% include "_footer.html" %}
 </main>
+{% endblock %}
+<script>
+  (function () {
+    var el = document.getElementById("clock");
+    function tick() {
+      var d = new Date();
+      el.textContent = d.toLocaleDateString(undefined, { weekday: "short" }) + " " +
+        d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+    if (el) { tick(); setInterval(tick, 15000); }
+  })();
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

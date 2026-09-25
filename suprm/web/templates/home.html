@@ -1,14 +1,74 @@
 {% extends "base.html" %}
-{% block content %}
-<section class="hero">
-  <h1>Your music on every store.<br>100% of your royalties, split your way.</h1>
-  <p>Suprm Sounds delivers your releases to Spotify, Apple Music, Amazon, TikTok, YouTube Music and more,
-     tracks every stream, and pays you and your collaborators automatically.</p>
-  <p><a class="btn" href="/signup">Create your free account</a></p>
-</section>
-<div class="grid">
-  <div class="card"><h2>Automatic splits</h2><p class="muted">Add producers and features by email. They get paid directly, even before they sign up.</p></div>
-  <div class="card"><h2>Store-ready QC</h2><p class="muted">We check your audio, artwork and metadata against store rules before anything ships, so you don't get rejected.</p></div>
-  <div class="card"><h2>Transparent earnings</h2><p class="muted">See every cent by store, country, track and month. Cash out through Stripe.</p></div>
-</div>
+{% block title %}Suprm Sounds{% endblock %}
+{% block desktop %}
+<main class="home">
+  {% for kind, msg in pop_flash(request) %}<div class="flash {{ kind }}" role="status">{{ msg }}</div>{% endfor %}
+  <div class="home-stage">
+    <section class="window" id="win-welcome" data-drag>
+      <div class="titlebar"><span class="box close"></span><span class="title">Welcome.txt</span><span class="box"></span></div>
+      <div class="window-body">
+        <h1 class="hero-title">Put your music on every store. <em>Keep your royalties.</em></h1>
+        <p class="lede">Suprm Sounds delivers your songs to Spotify, Apple Music, TikTok, YouTube Music, Amazon and more. We track every stream and pay you and your collaborators automatically.</p>
+        <div class="cta-row">
+          <a class="btn" href="/signup">Start releasing</a>
+          <a class="btn ghost" href="/login">Log in</a>
+        </div>
+        <div class="facts">
+          <div><b>150+</b><span>stores and streaming services</span></div>
+          <div><b>$0.00000001</b><span>precision on every payout</span></div>
+          <div><b>100%</b><span>of your masters stay yours</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="window" id="win-fm" data-drag aria-label="Suprm FM radio">
+      <div class="titlebar"><span class="box close"></span><span class="title">Suprm FM</span><span class="box"></span></div>
+      <div class="window-body" id="suprm-fm">
+        <div class="fm-screen">
+          <span class="now">Now tuned to</span>
+          <span data-station>Pool Party FM</span>
+          <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="fm-controls">
+          <button class="ghost small" data-prev aria-label="Previous station">&#9664;&#9664;</button>
+          <button class="small" data-play aria-pressed="false">Play</button>
+          <button class="ghost small" data-next aria-label="Next station">&#9654;&#9654;</button>
+        </div>
+        <p class="muted" style="margin:12px 0 0;font-size:14px">Music generated live in your browser. Something to vibe to while you upload.</p>
+      </div>
+    </section>
+
+    <section class="window" id="win-splits" data-drag>
+      <div class="titlebar"><span class="box close"></span><span class="title">Split Calculator</span><span class="box"></span></div>
+      <div class="window-body" id="split-calc">
+        <label>This month's streaming revenue (USD)<input id="calc-gross" type="number" min="0" step="0.01" value="1240.00"></label>
+        <div style="margin-top:14px">
+          <div class="split-row" data-split><span>You</span><input id="calc-a" type="number" min="0" max="100" step="0.01" value="60" aria-label="Your percent"><output></output></div>
+          <div class="split-row" data-split><span>Producer</span><input id="calc-b" type="number" min="0" max="100" step="0.01" value="25" aria-label="Producer percent"><output></output></div>
+          <div class="split-row" data-split><span>Feature</span><input id="calc-c" type="number" min="0" max="100" step="0.01" value="15" aria-label="Feature percent"><output></output></div>
+        </div>
+        <p class="muted" style="margin:8px 0 0;font-size:14px">Total: <b id="calc-total" class="mono">100%</b>. Collaborators get paid by email, even before they sign up.</p>
+      </div>
+    </section>
+
+    <section class="window" id="win-stores" data-drag>
+      <div class="titlebar"><span class="box close"></span><span class="title">Stores</span><span class="box"></span></div>
+      <div class="window-body">
+        <ul class="store-list">
+          <li>Spotify</li><li>Apple Music</li><li>YouTube Music</li><li>TikTok</li><li>Instagram &amp; Facebook</li>
+          <li>Amazon Music</li><li>Deezer</li><li>TIDAL</li><li>Pandora</li><li>Boomplay</li><li>Anghami</li><li>+ 140 more</li>
+        </ul>
+      </div>
+    </section>
+
+    <nav class="icons" aria-label="Shortcuts">
+      <a class="icon" href="/signup"><span class="glyph">&#10058;</span><span>Sign Up</span></a>
+      <a class="icon" href="/login"><span class="glyph folder">&#9835;</span><span>My Music</span></a>
+      <a class="icon" href="/legal/artist-agreement"><span class="glyph">&#167;</span><span>Artist Deal</span></a>
+      <a class="icon" href="/legal/content-policy"><span class="glyph">&#9888;</span><span>Rules</span></a>
+    </nav>
+  </div>
+  {% include "_footer.html" %}
+</main>
 {% endblock %}
+{% block scripts %}<script src="/static/desktop.js"></script>{% endblock %}

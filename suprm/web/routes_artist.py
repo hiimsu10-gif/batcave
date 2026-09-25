@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import uuid
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -26,6 +28,7 @@ from ..models import (
 )
 from ..qc import check_release
 from ..royalties.ledger import balance, earnings_breakdown
+from ..storage import get_storage
 from .app import render
 from .deps import current_user, db, flash, owned_release, owned_track, verify_csrf
 
@@ -50,27 +53,33 @@ def _require_editable(release: Release) -> None:
         raise HTTPException(400, "This release is locked while it's in review or live. Contact support to change it.")
 
 
-async def _save_upload(upload: UploadFile, user: User, max_bytes: int) -> Path:
-    """Stream an upload to MEDIA_ROOT/<user>/<uuid><ext>; returns the path relative to MEDIA_ROOT."""
+async def _receive_upload(upload: UploadFile, max_bytes: int) -> Path:
+    """Stream an upload to a temp file (checked before it goes to storage)."""
     ext = Path(upload.filename or "").suffix.lower()[:6]
-    rel = Path(str(user.id)) / f"{uuid.uuid4().hex}{ext}"
-    dest = settings.media_root / rel
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(suffix=ext, prefix="upload-")
+    tmp = Path(name)
     size = 0
-    with open(dest, "wb") as out:
+    with os.fdopen(fd, "wb") as out:
         while chunk := await upload.read(1 << 20):
             size += len(chunk)
             if size > max_bytes:
-                out.close()
-                dest.unlink(missing_ok=True)
-                raise MediaError("File is too large")
+                break
             out.write(chunk)
-    return rel
+    if size > max_bytes:
+        tmp.unlink(missing_ok=True)
+        raise MediaError("File is too large")
+    return tmp
 
 
-def _discard(rel: str | None) -> None:
-    if rel:
-        (settings.media_root / rel).unlink(missing_ok=True)
+def _store(tmp: Path, user: User) -> str:
+    key = f"{user.id}/{uuid.uuid4().hex}{tmp.suffix}"
+    get_storage().put(tmp, key)
+    return key
+
+
+def _discard(key: str | None) -> None:
+    if key:
+        get_storage().delete(key)
 
 
 # --- Dashboard ---------------------------------------------------------------
@@ -195,18 +204,17 @@ async def upload_artwork(release_id: int, request: Request, file: UploadFile,
                          user: User = Depends(current_user), session: Session = Depends(db)):
     release = owned_release(release_id, user, session)
     _require_editable(release)
+    tmp = None
     try:
-        rel = await _save_upload(file, user, MAX_IMAGE_BYTES)
-        try:
-            inspect_image(settings.media_root / rel)
-        except MediaError:
-            _discard(str(rel))
-            raise
+        tmp = await _receive_upload(file, MAX_IMAGE_BYTES)
+        inspect_image(tmp)
     except MediaError as exc:
+        if tmp:
+            tmp.unlink(missing_ok=True)
         flash(request, str(exc), "error")
         return _back(release.id)
     _discard(release.artwork_path)
-    release.artwork_path = str(rel)
+    release.artwork_path = _store(tmp, user)
     session.commit()
     flash(request, "Cover art uploaded", "success")
     return _back(release.id)
@@ -217,6 +225,10 @@ def submit_release(release_id: int, request: Request, user: User = Depends(curre
                    session: Session = Depends(db)):
     release = owned_release(release_id, user, session)
     _require_editable(release)
+    if not user.email_verified_at and not user.is_admin:
+        flash(request, "Confirm your email first. We sent a link when you signed up; resend it from Account.",
+              "error")
+        return _back(release.id)
     report = check_release(release)
     if not report.ok:
         flash(request, "Fix the errors below before submitting", "error")
@@ -262,14 +274,13 @@ async def add_track(
     if isrc and not is_valid_isrc(isrc):
         flash(request, f"ISRC {isrc} is not valid (format: CC-XXX-YY-NNNNN)", "error")
         return _back(release.id)
+    tmp = None
     try:
-        rel = await _save_upload(file, user, MAX_AUDIO_BYTES)
-        try:
-            info = inspect_audio(settings.media_root / rel)
-        except MediaError:
-            _discard(str(rel))
-            raise
+        tmp = await _receive_upload(file, MAX_AUDIO_BYTES)
+        info = inspect_audio(tmp)
     except MediaError as exc:
+        if tmp:
+            tmp.unlink(missing_ok=True)
         flash(request, str(exc), "error")
         return _back(release.id)
     track = Track(
@@ -279,7 +290,7 @@ async def add_track(
         version=version.strip() or None,
         explicit=explicit,
         isrc=normalize_isrc(isrc) if isrc else None,
-        audio_path=str(rel),
+        audio_path=_store(tmp, user),
         audio_codec=info.codec,
         duration_seconds=info.duration_seconds,
     )
@@ -403,7 +414,7 @@ def artwork_file(release_id: int, user: User = Depends(current_user), session: S
     release = owned_release(release_id, user, session)
     if not release.artwork_path:
         raise HTTPException(404)
-    return FileResponse(settings.media_root / release.artwork_path)
+    return get_storage().serve(release.artwork_path)
 
 
 @router.get("/files/audio/{track_id}")
@@ -411,4 +422,4 @@ def audio_file(track_id: int, user: User = Depends(current_user), session: Sessi
     track = owned_track(track_id, user, session)
     if not track.audio_path:
         raise HTTPException(404)
-    return FileResponse(settings.media_root / track.audio_path)
+    return get_storage().serve(track.audio_path)

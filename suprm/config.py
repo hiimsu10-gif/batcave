@@ -49,5 +49,37 @@ class Settings:
     stripe_secret_key: str = field(default_factory=lambda: _env("STRIPE_SECRET_KEY"))
     stripe_webhook_secret: str = field(default_factory=lambda: _env("STRIPE_WEBHOOK_SECRET"))
 
+    # File storage: "local" (MEDIA_ROOT on disk) or "s3" (AWS S3, Cloudflare R2, Backblaze B2...)
+    storage_backend: str = field(default_factory=lambda: _env("STORAGE_BACKEND", "local"))
+    s3_bucket: str = field(default_factory=lambda: _env("S3_BUCKET"))
+    s3_endpoint_url: str = field(default_factory=lambda: _env("S3_ENDPOINT_URL"))  # R2: https://<acct>.r2.cloudflarestorage.com
+    s3_region: str = field(default_factory=lambda: _env("S3_REGION", "auto"))
+    s3_access_key_id: str = field(default_factory=lambda: _env("S3_ACCESS_KEY_ID"))
+    s3_secret_access_key: str = field(default_factory=lambda: _env("S3_SECRET_ACCESS_KEY"))
+
+    # Email: "console" (prints to the log), "smtp", or "resend"
+    email_backend: str = field(default_factory=lambda: _env("EMAIL_BACKEND", "console"))
+    email_from: str = field(default_factory=lambda: _env("EMAIL_FROM", "Suprm Sounds <hello@suprmsounds.com>"))
+    smtp_host: str = field(default_factory=lambda: _env("SMTP_HOST"))
+    smtp_port: int = field(default_factory=lambda: int(_env("SMTP_PORT", "587")))
+    smtp_username: str = field(default_factory=lambda: _env("SMTP_USERNAME"))
+    smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD"))
+    resend_api_key: str = field(default_factory=lambda: _env("RESEND_API_KEY"))
+
+    # Jobs: run deliveries inside the web request (handy locally) or in `suprm worker`
+    jobs_inline: bool = field(default_factory=lambda: _env("JOBS_INLINE", "false").lower() == "true")
+    require_admin_2fa: bool = field(default_factory=lambda: _env("REQUIRE_ADMIN_2FA", "true").lower() == "true")
+
+    # Legal pages: filled into the policy templates
+    legal_entity_name: str = field(default_factory=lambda: _env("LEGAL_ENTITY_NAME", "Suprm Sounds LLC"))
+    legal_state: str = field(default_factory=lambda: _env("LEGAL_STATE", "[STATE]"))
+    legal_address: str = field(default_factory=lambda: _env("LEGAL_ADDRESS", "[BUSINESS ADDRESS]"))
+    support_email: str = field(default_factory=lambda: _env("SUPPORT_EMAIL", "support@suprmsounds.com"))
+    legal_version: str = field(default_factory=lambda: _env("LEGAL_VERSION", "2026-09-25"))
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
+
 
 settings = Settings()

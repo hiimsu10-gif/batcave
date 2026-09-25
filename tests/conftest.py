@@ -7,7 +7,8 @@ from pathlib import Path
 
 _TMP = Path(tempfile.mkdtemp(prefix="suprm-test-"))
 os.environ.update({
-    "DATABASE_URL": f"sqlite:///{_TMP / 'test.db'}",
+    # Set TEST_DATABASE_URL=postgresql+psycopg://... to run the suite against Postgres
+    "DATABASE_URL": os.environ.get("TEST_DATABASE_URL", f"sqlite:///{_TMP / 'test.db'}"),
     "MEDIA_ROOT": str(_TMP / "media"),
     "OUTBOX_ROOT": str(_TMP / "outbox"),
     "SECRET_KEY": "test-secret",

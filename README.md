@@ -4,9 +4,10 @@ An artist-first music distribution platform. Artists upload releases, split roya
 collaborators, and track every cent. Suprm Sounds delivers releases to stores as
 DDEX ERN packages, imports store royalty reports, and pays artists through Stripe Connect.
 
-**Start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md).** It explains how to get connected to
-stores (a white-label backend first, then direct feeds), what paperwork you need, and what's
-left to build.
+**Start here:**
+- [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md): the step-by-step checklist (DDEX ID, barcodes, ISRCs, Stripe, backend vendor emails, hosting)
+- [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md): how store connections work (a white-label backend first, then direct feeds) and what's left to build
+- [`suprm/legal/`](suprm/legal/): draft Terms, Artist Distribution Agreement, Privacy Policy and Content & Fraud Policy (attorney review needed)
 
 ## Quick start
 
@@ -22,6 +23,17 @@ suprm add-target "Local test" local --party-id PADPIDA0000000000T --party-name "
 
 uvicorn suprm.main:app --reload     # http://localhost:8000
 python -m pytest                    # run the tests
+```
+
+The admin console asks you to turn on two-factor login the first time you open it.
+
+## Production
+
+```bash
+pip install -e ".[postgres]"
+suprm migrate                       # apply database migrations (Postgres)
+uvicorn suprm.main:app              # web
+suprm worker                        # background deliveries (keep running)
 ```
 
 ## How a release flows
@@ -49,10 +61,17 @@ suprm/
   delivery/            transports (local/sftp/s3/http) + delivery service
   royalties/           report importer + split ledger
   payouts/             Stripe Connect
-  web/                 FastAPI app, templates, styles
+  web/                 FastAPI app, "Suprm OS" templates + styles
+  legal/               policy drafts shown at /legal/...
+  migrations/          Alembic database migrations
+  storage.py           local disk or S3/R2 file storage
+  jobs.py              background job queue (suprm worker)
+  email.py, tokens.py  verification + password reset email
+  totp.py              two-factor login
   cli.py               admin commands
 tests/                 unit tests + a full artist→store→royalty→payout run
 docs/BLUEPRINT.md      business + technical launch plan
+docs/SETUP_GUIDE.md    step-by-step setup + outreach emails
 ```
 
 ## Stripe webhook

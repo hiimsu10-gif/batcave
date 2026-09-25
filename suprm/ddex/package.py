@@ -16,7 +16,6 @@ tells the store the batch is fully uploaded and safe to ingest.
 """
 from __future__ import annotations
 
-import shutil
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -25,6 +24,7 @@ from pathlib import Path
 from ..config import settings
 from ..media import md5_file
 from ..models import Release
+from ..storage import Storage, get_storage
 from .ern import MessageContext, ResourceFile, build_new_release_message
 
 
@@ -52,9 +52,9 @@ def build_package(
     recipient_name: str,
     test_message: bool,
     takedown: bool = False,
-    media_root: Path | None = None,
+    storage: Storage | None = None,
 ) -> BuiltPackage:
-    media_root = media_root or settings.media_root
+    storage = storage or get_storage()
     batch_id = new_batch_id()
     message_id = uuid.uuid4().hex
     batch_dir = out_root / batch_id
@@ -68,16 +68,14 @@ def build_package(
         for track in release.tracks:
             if not track.audio_path:
                 raise ValueError(f"Track {track.track_number} has no audio")
-            src = media_root / track.audio_path
-            ext = src.suffix.lower() or ".flac"
+            ext = Path(track.audio_path).suffix.lower() or ".flac"
             name = f"{release.upc}_01_{track.track_number:03d}{ext}"
-            shutil.copyfile(src, res_dir / name)
+            storage.fetch(track.audio_path, res_dir / name)
             audio[track.id] = ResourceFile(uri=f"resources/{name}", md5=md5_file(res_dir / name))
         if not release.artwork_path:
             raise ValueError("Release has no artwork")
-        art_src = media_root / release.artwork_path
-        art_name = f"{release.upc}{art_src.suffix.lower() or '.jpg'}"
-        shutil.copyfile(art_src, res_dir / art_name)
+        art_name = f"{release.upc}{Path(release.artwork_path).suffix.lower() or '.jpg'}"
+        storage.fetch(release.artwork_path, res_dir / art_name)
         artwork = ResourceFile(uri=f"resources/{art_name}", md5=md5_file(res_dir / art_name))
     else:
         # Takedowns carry metadata only; stores match on UPC/ISRC.

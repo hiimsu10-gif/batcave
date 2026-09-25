@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..ddex.package import build_package
 from ..identifiers import next_isrc, next_upc
+from ..jobs import enqueue, handler, run_pending
 from ..models import (
     Delivery,
     DeliveryKind,
@@ -49,39 +50,62 @@ def approve_release(session: Session, release: Release) -> None:
     session.commit()
 
 
-def deliver(session: Session, release: Release, target: DeliveryTarget,
-            kind: DeliveryKind = DeliveryKind.insert) -> Delivery:
+def queue_delivery(session: Session, release: Release, target: DeliveryTarget,
+                   kind: DeliveryKind = DeliveryKind.insert) -> Delivery:
+    """Record a delivery and hand it to the background worker."""
     if not target.active:
         raise DeliveryError(f"Target {target.name} is disabled")
     if kind != DeliveryKind.takedown and release.status not in (ReleaseStatus.approved, ReleaseStatus.delivered):
         raise DeliveryError("Only approved releases can be delivered")
+    delivery = Delivery(release=release, target=target, kind=kind, batch_id="pending", message_id="pending")
+    session.add(delivery)
+    session.flush()
+    enqueue(session, "deliver", {"delivery_id": delivery.id})
+    session.commit()
+    if settings.jobs_inline:
+        run_pending(session)
+        session.refresh(delivery)
+    return delivery
 
-    out_root = settings.outbox_root / target.name
+
+def perform_delivery(session: Session, delivery: Delivery) -> Delivery:
+    """Build the DDEX package and upload it. Transport errors mark the delivery failed."""
+    release, target, kind = delivery.release, delivery.target, delivery.kind
     package = build_package(
         release,
-        out_root=out_root,
+        out_root=settings.outbox_root / target.name,
         recipient_party_id=target.recipient_party_id,
         recipient_name=target.recipient_party_name,
         test_message=target.test_mode,
         takedown=kind == DeliveryKind.takedown,
     )
-    delivery = Delivery(
-        release=release,
-        target=target,
-        kind=kind,
-        batch_id=package.batch_id,
-        message_id=package.message_id,
-        package_path=str(package.batch_dir),
-    )
-    session.add(delivery)
-    session.flush()
+    delivery.batch_id, delivery.message_id = package.batch_id, package.message_id
+    delivery.package_path = str(package.batch_dir)
     try:
         delivery.remote_ref = make_transport(target.transport, target.config or {}).send(package)
         delivery.status = DeliveryStatus.sent
         delivery.sent_at = datetime.now(timezone.utc)
+        delivery.error = None
         release.status = ReleaseStatus.taken_down if kind == DeliveryKind.takedown else ReleaseStatus.delivered
     except (TransportError, TypeError) as exc:
         delivery.status = DeliveryStatus.failed
         delivery.error = str(exc)
     session.commit()
+    return delivery
+
+
+@handler("deliver")
+def _deliver_job(session: Session, payload: dict) -> None:
+    delivery = session.get(Delivery, payload["delivery_id"])
+    if delivery and delivery.status == DeliveryStatus.queued:
+        perform_delivery(session, delivery)
+
+
+def deliver(session: Session, release: Release, target: DeliveryTarget,
+            kind: DeliveryKind = DeliveryKind.insert) -> Delivery:
+    """Queue and immediately perform a delivery (used by the CLI)."""
+    delivery = queue_delivery(session, release, target, kind)
+    if delivery.status == DeliveryStatus.queued:
+        run_pending(session)
+        session.refresh(delivery)
     return delivery
