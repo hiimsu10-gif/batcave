@@ -16,6 +16,18 @@ Su's command center for every idea, project, task and gig in one place.
 
 Verticals: `music` (Suprm Sounds), `film` (Golden Hour), `content` (Side B & Sidenotes), `web` (Web + GBP), `biz` (Aurelia Corp), `personal`.
 
+## Rekordbox check (run on the Mac)
+
+`tools/rekordbox_itr_check.py` compares the ITR set lists in Dropbox (`Setlists/ITR Ep*Setlists.md`) with the Rekordbox library. For each track it reports whether it's imported, Rekordbox's key and BPM, and whether the file is on disk, online-only or missing.
+
+```sh
+pip3 install pyrekordbox
+python3 tools/rekordbox_itr_check.py              # writes Setlists/ITR Rekordbox Check.md
+python3 tools/rekordbox_itr_check.py --download   # also downloads online-only Dropbox files
+```
+
+Close Rekordbox first. On Rekordbox 7, if the database won't open, run `python3 -m pyrekordbox download-key` once.
+
 ## Updating
 
 - **On the page:** use the capture bar for quick ideas. Tap any item to edit it, or use "Make it a project" on an idea.
