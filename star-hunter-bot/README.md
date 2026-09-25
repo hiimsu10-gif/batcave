@@ -32,6 +32,7 @@ npm install
 cp .env.example .env                                   # paste DISCORD_TOKEN and DEEPL_API_KEY
 cp config/star-hunter.example.json config/star-hunter.json
 ```
+`config/star-hunter.json` gets committed so your host can read it. `.env` stays private.
 In Discord, go to **User Settings → Advanced** and turn on **Developer Mode**. Then right-click a server, channel or role and choose **Copy ID**. Replace every `PASTE_..._ID` in `config/star-hunter.json`. Delete any sections you don't need, like `mirrors` or roles you don't want in the picker.
 
 ### 4. Run
@@ -62,8 +63,18 @@ Common codes: `EN-US`, `EN-GB`, `ES`, `PT-BR`, `FR`, `DE`, `IT`, `JA`, `KO`, `ZH
 ## Running a second server
 The code isn't tied to one server. For your second server, create a second bot in the Developer Portal. Then make `config/other-server.json` and run another copy with its own `.env` (`DISCORD_TOKEN=...`, `BOT_CONFIG=config/other-server.json`).
 
-## Hosting
-The bot has to stay running. Good options: a small VPS, Railway or Render (worker service), or a Raspberry Pi with [`pm2`](https://pm2.keymetrics.io/) (`pm2 start src/index.js --name star-hunter`).
+## Hosting (Railway, deploys from GitHub)
+GitHub itself can't keep a bot online. Actions jobs stop after 6 hours and aren't meant to be servers. Railway runs the bot 24/7 and redeploys every time you push to GitHub.
+
+1. Commit your filled-in `config/star-hunter.json`. Server, channel and role IDs are not secret. **Never commit `.env` or your token.**
+2. Go to <https://railway.com>, sign in with GitHub, then **New Project → Deploy from GitHub repo → `batcave`**.
+3. In the service **Settings**, set **Root Directory** to `star-hunter-bot`. The start command is `npm start`, which Railway picks up automatically.
+4. In **Variables**, add `DISCORD_TOKEN` and `DEEPL_API_KEY`.
+5. Deploy. The logs should show `Logged in as ...` and `Registered slash commands in Star Hunter | Last Order`.
+
+If your token ever leaks (pasted in a chat, committed, screenshotted), go to Developer Portal → Bot → **Reset Token** and update the Railway variable.
+
+Other options: a small VPS, or your own PC with [`pm2`](https://pm2.keymetrics.io/) (`pm2 start src/index.js --name star-hunter`). A PC only works while it's on.
 
 ## Development
 `npm run check` runs a syntax check and the test for mention and link protection.
