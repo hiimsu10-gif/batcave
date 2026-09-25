@@ -1,0 +1,452 @@
+<title>The Batcave</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#EEF0F3; --surface:#FFFFFF; --surface-2:#E3E7EC; --ink:#141A22; --muted:#5A6573; --line:#CDD3DB;
+  --signal:#E3A82B; --signal-ink:#1A1408; --accent-text:#8A5A0E;
+  --ok:#2F8F5B; --bad:#C4453A;
+  --v-music:#7C6CF0; --v-film:#E06C4F; --v-web:#2E9BB8; --v-content:#D25CA6; --v-biz:#5C9E4A; --v-personal:#8C93A0;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F141B; --surface:#161D26; --surface-2:#1E2732; --ink:#E6EAF0; --muted:#8E9AAA; --line:#2A3440;
+    --accent-text:#F0BC4F; --ok:#4CC38A; --bad:#F07167;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F141B; --surface:#161D26; --surface-2:#1E2732; --ink:#E6EAF0; --muted:#8E9AAA; --line:#2A3440;
+  --accent-text:#F0BC4F; --ok:#4CC38A; --bad:#F07167;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:.01em}
+h1{font-size:clamp(34px,6vw,52px);font-weight:800;line-height:1;text-transform:uppercase}
+h2{font-size:22px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.label{font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* header */
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.brand{display:flex;align-items:center;gap:14px}
+.brand svg{flex:none}
+.sub{color:var(--muted);font-size:14px;margin-top:4px}
+.sync{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;flex:none}
+.sync.live .dot{background:var(--ok)}
+.sync.off .dot{background:var(--bad)}
+
+/* capture */
+.capture{display:flex;flex-wrap:wrap;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px}
+.capture input{flex:1 1 240px;min-width:0;border:0;background:transparent;padding:10px 8px;font-size:16px}
+.capture input:focus{outline:none}
+.capture:focus-within{border-color:var(--signal)}
+select,input[type=text],input[type=date],input[type=number],input[type=url],textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-weight:600}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.danger{color:var(--bad)}
+.btn.danger.armed{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* nav */
+nav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;font-weight:600;color:var(--muted);white-space:nowrap}
+nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--signal)}
+nav .count{font:500 11px var(--mono);color:var(--muted);margin-left:6px}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:13px;font-weight:500}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.vdot{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
+
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px}
+.empty{color:var(--muted);font-size:14px;padding:8px 0}
+
+/* summary table */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--surface-2)}
+.zero{color:var(--muted);opacity:.6}
+
+/* rows */
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:start;padding:10px 4px;border-top:1px solid var(--line);text-align:left;background:none;border-inline:0;border-bottom:0;width:100%}
+.row:first-child{border-top:0}
+.row:hover{background:var(--surface-2)}
+.row .t{font-weight:600}
+.row .s{color:var(--muted);font-size:13.5px;grid-column:2/4}
+.row .vdot{margin-top:7px}
+.meta{font:500 12px var(--mono);color:var(--muted);white-space:nowrap}
+.meta.late{color:var(--bad)}
+.pill{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
+.pill.active,.pill.confirmed,.pill.paid,.pill.promoted{color:var(--ok);border-color:currentColor}
+.pill.developing,.pill.pitched,.pill.spark{color:var(--accent-text);border-color:currentColor}
+
+/* kanban */
+.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.board{grid-template-columns:1fr}}
+.col{background:var(--surface-2);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.col-head{display:flex;justify-content:space-between;align-items:baseline;padding:2px 4px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:6px;width:100%}
+.card:hover{border-color:var(--muted)}
+.card .t{font-weight:600;line-height:1.3}
+.card .nx{font-size:13.5px;color:var(--muted)}
+.card .nx b{color:var(--ink);font-weight:500}
+.card .foot{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.vtag{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+
+/* tasks */
+.task{display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;align-items:start;padding:10px 4px;border-top:1px solid var(--line)}
+.task:first-child{border-top:0}
+.task input[type=checkbox]{width:18px;height:18px;margin-top:3px;accent-color:var(--signal)}
+.task .t{background:none;border:0;padding:0;text-align:left;font-weight:600}
+.task .s{grid-column:2/4;color:var(--muted);font-size:13px}
+.task.done .t{text-decoration:line-through;color:var(--muted);font-weight:500}
+
+/* money */
+.stats{display:flex;flex-wrap:wrap;gap:24px}
+.stat .v{font:600 26px var(--mono);font-variant-numeric:tabular-nums}
+
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);padding:0;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px)}
+dialog::backdrop{background:rgb(8 12 18 / .55)}
+.dlg{display:flex;flex-direction:column;gap:14px;padding:20px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields .full{grid-column:1/-1}
+@media (max-width:480px){.fields{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field textarea{min-height:88px;resize:vertical}
+.field.check{flex-direction:row;align-items:center;gap:8px}
+.dlg-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
+.dlg-foot div{display:flex;gap:8px;flex-wrap:wrap}
+.linkout{color:var(--accent-text);font-size:13px;word-break:break-all}
+.notice{background:var(--surface-2);border-radius:8px;padding:12px 14px;font-size:14px}
+@media (prefers-reduced-motion:no-preference){.card,.row,.btn{transition:border-color .15s,background .15s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="46" height="28" viewBox="0 0 46 28" aria-hidden="true"><path fill="var(--signal)" d="M23 5l2.2-4 1.3 4.6c3.2-.8 7.4-.3 10.5 1.6C35 9.4 36 12 39 13.6c2.4-1.9 5.2-2.3 7-1.6-3.2 2-4.6 6-4.6 9.4-2.3-1.4-5-1.5-7.2-.4.6-2.4-.8-4.6-3.2-5-1.4 3.2-4.4 5.6-8 7.4-3.6-1.8-6.6-4.2-8-7.4-2.4.4-3.8 2.6-3.2 5-2.2-1.1-4.9-1-7.2.4 0-3.4-1.4-7.4-4.6-9.4 1.8-.7 4.6-.3 7 1.6C10 12 11 9.4 9 7.2c3.1-1.9 7.3-2.4 10.5-1.6L20.8 1z"/></svg>
+      <div>
+        <h1>The Batcave</h1>
+        <div class="sub">Every idea, project, task and gig across Suprm Sounds, Golden Hour and the rest.</div>
+      </div>
+    </div>
+    <div class="sync label" id="sync"><span class="dot"></span><span id="syncText">Connecting…</span></div>
+  </header>
+
+  <form class="capture" id="capture" autocomplete="off">
+    <input type="text" id="capTitle" placeholder="Drop an idea… (Enter to save to the inbox)" aria-label="New idea">
+    <select id="capVert" aria-label="Area"></select>
+    <button class="btn primary" type="submit">Save idea</button>
+  </form>
+
+  <nav role="tablist" id="tabs"></nav>
+  <div class="filters" id="filters" aria-label="Filter by area"></div>
+
+  <main id="view"></main>
+</div>
+
+<dialog id="dlg"><form class="dlg" id="dlgForm" method="dialog"></form></dialog>
+
+<script>
+const VERTS=[
+  {k:"music",n:"Suprm Sounds · Music & DJ"},
+  {k:"film",n:"Golden Hour · Film"},
+  {k:"content",n:"Content · Side B & Sidenotes"},
+  {k:"web",n:"Web + GBP"},
+  {k:"biz",n:"Aurelia Corp · Business"},
+  {k:"personal",n:"Personal"}
+];
+const VN=Object.fromEntries(VERTS.map(v=>[v.k,v.n]));
+const vShort=k=>(VN[k]||"Unsorted").split(" · ")[0];
+const PSTAT=["developing","active","paused","done"];
+const ISTAGE=["spark","developing","promoted","shelved"];
+const GKIND=["booking","lead","release","income"];
+const GSTAT=["lead","pitched","confirmed","played","paid","passed"];
+const PRIO=["high","med","low"];
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+
+const SCHEMA={
+  projects:{one:"project",fields:[
+    {k:"title",l:"Name",t:"text",full:1,req:1},
+    {k:"vertical",l:"Area",t:"select",o:VERTS.map(v=>[v.k,v.n])},
+    {k:"status",l:"Status",t:"select",o:PSTAT.map(s=>[s,cap(s)])},
+    {k:"next",l:"Next action",t:"text",full:1},
+    {k:"due",l:"Due",t:"date"},
+    {k:"link",l:"Link (Notion, Drive…)",t:"url"},
+    {k:"notes",l:"Notes",t:"textarea",full:1}]},
+  ideas:{one:"idea",fields:[
+    {k:"title",l:"Idea",t:"text",full:1,req:1},
+    {k:"vertical",l:"Area",t:"select",o:VERTS.map(v=>[v.k,v.n])},
+    {k:"stage",l:"Stage",t:"select",o:ISTAGE.map(s=>[s,cap(s)])},
+    {k:"note",l:"Notes",t:"textarea",full:1},
+    {k:"link",l:"Link",t:"url",full:1}]},
+  tasks:{one:"task",fields:[
+    {k:"title",l:"Task",t:"text",full:1,req:1},
+    {k:"projectId",l:"Project",t:"project"},
+    {k:"priority",l:"Priority",t:"select",o:PRIO.map(s=>[s,cap(s)])},
+    {k:"due",l:"Due",t:"date"},
+    {k:"done",l:"Done",t:"check"}]},
+  gigs:{one:"gig or money item",fields:[
+    {k:"title",l:"What",t:"text",full:1,req:1},
+    {k:"kind",l:"Type",t:"select",o:GKIND.map(s=>[s,cap(s)])},
+    {k:"status",l:"Status",t:"select",o:GSTAT.map(s=>[s,cap(s)])},
+    {k:"date",l:"Date",t:"date"},
+    {k:"amount",l:"Amount ($)",t:"number"},
+    {k:"contact",l:"Contact / venue",t:"text",full:1},
+    {k:"link",l:"Link",t:"url",full:1},
+    {k:"notes",l:"Notes",t:"textarea",full:1}]}
+};
+
+const TABS=[["overview","Overview"],["projects","Projects"],["ideas","Ideas"],["tasks","Tasks"],["gigs","Gigs & Money"]];
+const S={projects:[],ideas:[],tasks:[],gigs:[]};
+let db=null, tab="overview", filter="all", loaded=false;
+try{tab=localStorage.getItem("bc.tab")||tab;filter=localStorage.getItem("bc.filter")||filter;}catch(e){}
+if(!TABS.some(t=>t[0]===tab))tab="overview";
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const fmtDate=d=>{if(!d)return"";const [y,m,dd]=d.split("-").map(Number);return new Date(y,m-1,dd).toLocaleDateString(undefined,{month:"short",day:"numeric"})};
+const money=n=>"$"+Math.round(n||0).toLocaleString();
+const vdot=k=>`<span class="vdot" style="background:var(--v-${VN[k]?k:"personal"})"></span>`;
+const inF=x=>filter==="all"||x.vertical===filter;
+const projOf=id=>S.projects.find(p=>p.id===id);
+const taskVert=t=>projOf(t.projectId)?.vertical||t.vertical;
+const dueMeta=d=>d?`<span class="meta ${d<today()?"late":""}">${d<today()?"Late · ":""}${esc(fmtDate(d))}</span>`:"";
+
+function setSync(state,text){const el=$("#sync");el.className="sync label "+state;$("#syncText").textContent=text}
+
+/* ---------- render ---------- */
+function renderChrome(){
+  $("#capVert").innerHTML=VERTS.map(v=>`<option value="${v.k}" ${filter===v.k?"selected":""}>${esc(vShort(v.k))}</option>`).join("");
+  const counts={overview:"",projects:S.projects.filter(p=>p.status!=="done"&&inF(p)).length,ideas:S.ideas.filter(i=>(i.stage==="spark"||i.stage==="developing")&&inF(i)).length,tasks:S.tasks.filter(t=>!t.done&&(filter==="all"||taskVert(t)===filter)).length,gigs:S.gigs.filter(g=>!["paid","passed"].includes(g.status)).length};
+  $("#tabs").innerHTML=TABS.map(([k,n])=>`<button role="tab" data-tab="${k}" aria-selected="${tab===k}">${n}${counts[k]!==""?`<span class="count">${counts[k]}</span>`:""}</button>`).join("");
+  $("#filters").innerHTML=`<button class="chip" data-f="all" aria-pressed="${filter==="all"}">All areas</button>`+VERTS.map(v=>`<button class="chip" data-f="${v.k}" aria-pressed="${filter===v.k}">${vdot(v.k)}${esc(vShort(v.k))}</button>`).join("");
+  $("#filters").hidden=tab==="gigs";
+}
+
+function projectCard(p){
+  const open=S.tasks.filter(t=>t.projectId===p.id&&!t.done).length;
+  return `<button class="card" data-edit="projects:${p.id}">
+    <span class="vtag">${vdot(p.vertical)}${esc(vShort(p.vertical))}</span>
+    <span class="t">${esc(p.title)}</span>
+    ${p.next?`<span class="nx"><b>Next:</b> ${esc(p.next)}</span>`:""}
+    <span class="foot">${dueMeta(p.due)||"<span></span>"}${open?`<span class="meta">${open} open task${open>1?"s":""}</span>`:""}</span>
+  </button>`;
+}
+
+function viewOverview(){
+  const rows=VERTS.filter(v=>filter==="all"||v.k===filter).map(v=>{
+    const a=S.projects.filter(p=>p.vertical===v.k&&p.status==="active").length;
+    const d=S.projects.filter(p=>p.vertical===v.k&&p.status==="developing").length;
+    const i=S.ideas.filter(x=>x.vertical===v.k&&(x.stage==="spark"||x.stage==="developing")).length;
+    const t=S.tasks.filter(x=>!x.done&&taskVert(x)===v.k).length;
+    const c=n=>`<td class="n ${n?"":"zero"}">${n}</td>`;
+    return `<tr class="click" data-f="${v.k}"><td>${vdot(v.k)} ${esc(v.n)}</td>${c(a)}${c(d)}${c(i)}${c(t)}</tr>`}).join("");
+  const moves=S.projects.filter(p=>p.status==="active"&&inF(p)).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
+  const due=S.tasks.filter(t=>!t.done&&(filter==="all"||taskVert(t)===filter)).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999")||PRIO.indexOf(a.priority)-PRIO.indexOf(b.priority)).slice(0,8);
+  const fresh=S.ideas.filter(i=>i.stage==="spark"&&inF(i)).sort((a,b)=>(b.created||"").localeCompare(a.created||"")).slice(0,6);
+  const pipe=S.gigs.filter(g=>["lead","pitched","confirmed"].includes(g.status));
+  const booked=S.gigs.filter(g=>g.status==="confirmed").reduce((s,g)=>s+(+g.amount||0),0);
+  return `
+  <section class="panel">
+    <div class="panel-head"><h2>Areas</h2><span class="label">Tap a row to filter</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Area</th><th class="n">Active</th><th class="n">Developing</th><th class="n">Ideas</th><th class="n">Open tasks</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </section>
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head"><h2>Next moves</h2><button class="btn" data-new="projects">Add project</button></div>
+      <div class="rows">${moves.length?moves.map(p=>`<button class="row" data-edit="projects:${p.id}">${vdot(p.vertical)}<span class="t">${esc(p.title)}</span>${dueMeta(p.due)}<span class="s">${p.next?esc(p.next):"No next action set. Tap to add one."}</span></button>`).join(""):`<div class="empty">No active projects${filter!=="all"?" in this area":""}. Move one to Active on the Projects tab.</div>`}</div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Up next</h2><button class="btn" data-new="tasks">Add task</button></div>
+      <div class="rows">${due.length?due.map(taskRow).join(""):`<div class="empty">No open tasks. Add the first step for an active project.</div>`}</div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Fresh ideas</h2><button class="btn" data-tab-go="ideas">All ideas</button></div>
+      <div class="rows">${fresh.length?fresh.map(ideaRow).join(""):`<div class="empty">The inbox is empty. Use the capture bar up top.</div>`}</div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Gig pipeline</h2><button class="btn" data-tab-go="gigs">Open</button></div>
+      <div class="stats">
+        ${["lead","pitched","confirmed"].map(s=>`<div class="stat"><div class="label">${cap(s)}</div><div class="v">${S.gigs.filter(g=>g.status===s).length}</div></div>`).join("")}
+        <div class="stat"><div class="label">Booked value</div><div class="v">${money(booked)}</div></div>
+      </div>
+      <div class="rows">${pipe.slice(0,4).map(gigRow).join("")||`<div class="empty">Nothing in the pipeline.</div>`}</div>
+    </section>
+  </div>`;
+}
+
+function viewProjects(){
+  const list=S.projects.filter(inF);
+  return `<section class="panel"><div class="panel-head"><h2>Projects</h2><button class="btn primary" data-new="projects">Add project</button></div>
+  <div class="board">${PSTAT.map(s=>{const items=list.filter(p=>(p.status||"developing")===s);
+    return `<div class="col"><div class="col-head"><span class="label">${cap(s)}</span><span class="meta">${items.length}</span></div>${items.map(projectCard).join("")||`<div class="empty">Empty</div>`}</div>`}).join("")}</div></section>`;
+}
+
+function ideaRow(i){return `<button class="row" data-edit="ideas:${i.id}">${vdot(i.vertical)}<span class="t">${esc(i.title)}</span><span class="pill ${esc(i.stage)}">${esc(i.stage||"spark")}</span>${i.note?`<span class="s">${esc(i.note.length>140?i.note.slice(0,140)+"…":i.note)}</span>`:""}</button>`}
+function viewIdeas(){
+  const list=S.ideas.filter(inF).sort((a,b)=>(b.created||"").localeCompare(a.created||""));
+  return `<div class="grid-2">${ISTAGE.map(st=>{const items=list.filter(i=>(i.stage||"spark")===st);
+    return `<section class="panel"><div class="panel-head"><h2>${cap(st)}</h2><span class="meta">${items.length}</span></div><div class="rows">${items.map(ideaRow).join("")||`<div class="empty">${st==="spark"?"Nothing new. Use the capture bar up top.":"None yet."}</div>`}</div></section>`}).join("")}</div>`;
+}
+
+function taskRow(t){const p=projOf(t.projectId);
+  return `<div class="task ${t.done?"done":""}"><input type="checkbox" data-toggle="${t.id}" ${t.done?"checked":""} aria-label="Mark ${esc(t.title)} done"><button class="t" data-edit="tasks:${t.id}">${esc(t.title)}</button>${dueMeta(t.done?"":t.due)||`<span class="meta">${t.priority==="high"?"High":""}</span>`}<span class="s">${p?`${vdot(p.vertical)} ${esc(p.title)}`:t.vertical?`${vdot(t.vertical)} ${esc(vShort(t.vertical))}`:"No project"}${t.priority&&t.priority!=="med"?` · ${esc(cap(t.priority))} priority`:""}</span></div>`}
+function viewTasks(){
+  const list=S.tasks.filter(t=>filter==="all"||taskVert(t)===filter);
+  const open=list.filter(t=>!t.done).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999")||PRIO.indexOf(a.priority)-PRIO.indexOf(b.priority));
+  const done=list.filter(t=>t.done).sort((a,b)=>(b.updated||"").localeCompare(a.updated||"")).slice(0,15);
+  return `<div class="grid-2"><section class="panel"><div class="panel-head"><h2>Open</h2><button class="btn primary" data-new="tasks">Add task</button></div><div class="rows">${open.map(taskRow).join("")||`<div class="empty">All clear.</div>`}</div></section>
+  <section class="panel"><div class="panel-head"><h2>Recently done</h2><span class="meta">${done.length}</span></div><div class="rows">${done.map(taskRow).join("")||`<div class="empty">Nothing checked off yet.</div>`}</div></section></div>`;
+}
+
+function gigRow(g){return `<button class="row" data-edit="gigs:${g.id}"><span class="pill ${esc(g.status)}">${esc(g.status||"lead")}</span><span class="t">${esc(g.title)}</span><span class="meta">${g.amount?money(g.amount):""}</span><span class="s">${[cap(g.kind||"booking"),g.date&&fmtDate(g.date),g.contact].filter(Boolean).map(esc).join(" · ")}</span></button>`}
+function viewGigs(){
+  const sum=f=>S.gigs.filter(f).reduce((s,g)=>s+(+g.amount||0),0);
+  const yr=today().slice(0,4);
+  const list=[...S.gigs].sort((a,b)=>GSTAT.indexOf(a.status)-GSTAT.indexOf(b.status)||(a.date||"9999").localeCompare(b.date||"9999"));
+  return `<section class="panel"><div class="panel-head"><h2>Gigs & Money</h2><button class="btn primary" data-new="gigs">Add gig or income</button></div>
+  <div class="stats">
+    <div class="stat"><div class="label">Open leads</div><div class="v">${S.gigs.filter(g=>g.status==="lead"||g.status==="pitched").length}</div></div>
+    <div class="stat"><div class="label">Booked (unpaid)</div><div class="v">${money(sum(g=>g.status==="confirmed"||g.status==="played"))}</div></div>
+    <div class="stat"><div class="label">Paid in ${yr}</div><div class="v">${money(sum(g=>g.status==="paid"&&(g.date||"").startsWith(yr)))}</div></div>
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>Status</th><th>What</th><th>Type</th><th>Date</th><th class="n">Amount</th></tr></thead><tbody>
+  ${list.map(g=>`<tr class="click" data-edit="gigs:${g.id}"><td><span class="pill ${esc(g.status)}">${esc(g.status||"lead")}</span></td><td><strong>${esc(g.title)}</strong>${g.contact?`<div class="meta">${esc(g.contact)}</div>`:""}</td><td>${esc(cap(g.kind||"booking"))}</td><td class="mono">${esc(fmtDate(g.date))}</td><td class="n">${g.amount?money(g.amount):"—"}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">No gigs yet.</td></tr>`}
+  </tbody></table></div></section>`;
+}
+
+function render(){
+  renderChrome();
+  if(!db&&loaded){$("#view").innerHTML=`<div class="notice">Your data loads when this page is opened on claude.ai. This view can't reach the Batcave's storage.</div>`;return}
+  $("#view").innerHTML={overview:viewOverview,projects:viewProjects,ideas:viewIdeas,tasks:viewTasks,gigs:viewGigs}[tab]();
+}
+
+/* ---------- editing ---------- */
+let cur=null;
+function field(f,v){
+  const id="f_"+f.k, cls="field"+(f.full?" full":"")+(f.t==="check"?" check":"");
+  let input;
+  if(f.t==="select")input=`<select id="${id}" name="${f.k}">${f.o.map(([k,n])=>`<option value="${k}" ${v===k?"selected":""}>${esc(n)}</option>`).join("")}</select>`;
+  else if(f.t==="project")input=`<select id="${id}" name="${f.k}"><option value="">No project</option>${S.projects.filter(p=>p.status!=="done"||p.id===v).map(p=>`<option value="${p.id}" ${v===p.id?"selected":""}>${esc(p.title)}</option>`).join("")}</select>`;
+  else if(f.t==="textarea")input=`<textarea id="${id}" name="${f.k}">${esc(v)}</textarea>`;
+  else if(f.t==="check")return `<label class="${cls}"><input type="checkbox" id="${id}" name="${f.k}" ${v?"checked":""}> ${f.l}</label>`;
+  else input=`<input type="${f.t==="url"?"text":f.t}" id="${id}" name="${f.k}" value="${esc(v)}" ${f.req?"required":""} ${f.t==="number"?'step="any" min="0"':""}>`;
+  return `<label class="${cls}"><span class="label">${f.l}</span>${input}</label>`;
+}
+function openEdit(col,id,preset={}){
+  const sc=SCHEMA[col], item=id?S[col].find(x=>x.id===id):null;
+  if(id&&!item)return;
+  const data=item||{vertical:filter!=="all"?filter:"music",status:col==="gigs"?"lead":"developing",stage:"spark",priority:"med",kind:"booking",...preset};
+  cur={col,id};
+  const link=item?.link&&/^https?:\/\//.test(item.link)?`<a class="linkout" href="${esc(item.link)}" target="_blank" rel="noopener">Open linked page ↗</a>`:"";
+  $("#dlgForm").innerHTML=`<div class="panel-head"><h2>${item?"Edit":"New"} ${sc.one}</h2><button class="btn" type="button" data-close>Close</button></div>
+    <div class="fields">${sc.fields.map(f=>field(f,data[f.k])).join("")}</div>${link}
+    <div class="dlg-foot"><div>${item?`<button class="btn danger" type="button" data-del>Delete</button>`:""}${item&&col==="ideas"&&item.stage!=="promoted"?`<button class="btn" type="button" data-promote>Make it a project</button>`:""}</div>
+    <div><button class="btn primary" type="submit" data-save>Save</button></div></div>`;
+  $("#dlg").showModal();
+  $("#f_title")?.focus();
+}
+function readForm(){
+  const out={};
+  for(const f of SCHEMA[cur.col].fields){const el=document.getElementById("f_"+f.k);if(!el)continue;
+    out[f.k]=f.t==="check"?el.checked:f.t==="number"?(el.value===""?null:+el.value):el.value.trim();}
+  if(cur.col==="tasks")out.vertical=projOf(out.projectId)?.vertical||(cur.id&&S.tasks.find(x=>x.id===cur.id)?.vertical)||(filter!=="all"?filter:null);
+  out.updated=new Date().toISOString();
+  return out;
+}
+async function write(fn,okMsg){
+  if(!db){setSync("off","Not connected");return false}
+  try{await fn();if(okMsg)flash(okMsg);return true}
+  catch(e){setSync("off",e?.code==="quota_exceeded"?"Storage full. Delete old items.":e?.code==="invalid_argument"?"You can view but not edit this Batcave.":"Couldn't save. Try again.");return false}
+}
+let flashT;function flash(m){setSync("live",m);clearTimeout(flashT);flashT=setTimeout(()=>setSync("live","Synced"),2200)}
+
+$("#dlgForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const data=readForm(); if(!data.title){$("#f_title").focus();return}
+  const {col,id}=cur; const btn=$("[data-save]"); btn.disabled=true;
+  const ok=await write(()=>id?db.collection(col).doc(id).update(data):db.collection(col).add({...data,created:new Date().toISOString()}),"Saved");
+  btn.disabled=false; if(ok)$("#dlg").close();
+});
+$("#dlgForm").addEventListener("click",async e=>{
+  if(e.target.closest("[data-close]"))return $("#dlg").close();
+  const del=e.target.closest("[data-del]");
+  if(del){
+    if(!del.classList.contains("armed")){del.classList.add("armed");del.textContent="Tap again to delete";setTimeout(()=>{del.classList.remove("armed");del.textContent="Delete"},3000);return}
+    const {col,id}=cur; if(await write(()=>db.collection(col).doc(id).delete(),"Deleted"))$("#dlg").close();
+  }
+  if(e.target.closest("[data-promote]")){
+    const idea=S.ideas.find(x=>x.id===cur.id); if(!idea)return;
+    const now=new Date().toISOString();
+    const ok=await write(async()=>{
+      const ref=await db.collection("projects").add({title:idea.title,vertical:idea.vertical,status:"developing",next:"",notes:idea.note||"",link:idea.link||"",fromIdea:idea.id,created:now,updated:now});
+      await db.collection("ideas").doc(idea.id).update({stage:"promoted",projectId:ref.id,updated:now});
+    },"Moved to Projects");
+    if(ok){$("#dlg").close();tab="projects";save();render()}
+  }
+});
+
+function save(){try{localStorage.setItem("bc.tab",tab);localStorage.setItem("bc.filter",filter)}catch(e){}}
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-tab]");if(t){tab=t.dataset.tab;save();return render()}
+  const g=e.target.closest("[data-tab-go]");if(g){tab=g.dataset.tabGo;save();return render()}
+  const f=e.target.closest("[data-f]");if(f&&!e.target.closest("dialog")){filter=filter===f.dataset.f&&f.tagName==="TR"?"all":f.dataset.f;save();return render()}
+  const ed=e.target.closest("[data-edit]");if(ed){const [c,id]=ed.dataset.edit.split(":");return openEdit(c,id)}
+  const n=e.target.closest("[data-new]");if(n)return openEdit(n.dataset.new,null);
+});
+document.addEventListener("change",async e=>{
+  const id=e.target.dataset?.toggle;if(!id)return;
+  const done=e.target.checked;
+  if(!await write(()=>db.collection("tasks").doc(id).update({done,updated:new Date().toISOString()}),done?"Done":"Reopened"))e.target.checked=!done;
+});
+$("#capture").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const title=$("#capTitle").value.trim(); if(!title)return;
+  const now=new Date().toISOString();
+  if(await write(()=>db.collection("ideas").add({title,vertical:$("#capVert").value,stage:"spark",note:"",created:now,updated:now}),"Idea saved"))$("#capTitle").value="";
+});
+
+/* ---------- boot ---------- */
+render();
+(async()=>{
+  try{db=window.claude?.use?await window.claude.use("db"):null}catch(e){db=null}
+  loaded=true;
+  if(!db){setSync("off","Offline");return render()}
+  setSync("","Loading…");
+  let pending=new Set(Object.keys(S));
+  for(const c of Object.keys(S)){
+    db.collection(c).onSnapshot(snap=>{
+      S[c]=snap.docs.map(d=>({id:d.id,...d.data()}));
+      pending.delete(c); if(!pending.size)setSync("live","Synced");
+      if(!$("#dlg").open)render(); else renderChrome();
+    },err=>setSync("off",err?.code==="revoked"?"Access changed":"Lost connection. Reload the page."));
+  }
+})();
+$("#dlg").addEventListener("close",()=>render());
+</script>
