@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 import shutil
+import threading
 import unicodedata
 from collections import Counter, defaultdict
 from contextlib import contextmanager
@@ -16,7 +17,8 @@ from pyrekordbox import Rekordbox6Database
 from pyrekordbox.db6 import tables
 from pyrekordbox.utils import get_rekordbox_pid
 
-from . import discovery
+from . import discovery, xmlbridge
+from .pending import PendingQueue
 from .camelot import compatible_keys, to_camelot
 from .textmatch import (
     best_matches,
@@ -75,6 +77,12 @@ class Config:
     backup_dir: Path = field(default_factory=lambda: Path.home() / "Documents" / "rekordbox-mcp-backups")
     downloads_dir: Path | None = None
     unlock: bool = True
+    # Holds the queue of edits made while Rekordbox is open, and the XML file Rekordbox imports.
+    home_dir: Path = field(default_factory=lambda: Path.home() / "Documents" / "rekordbox-mcp")
+
+    @property
+    def xml_path(self) -> Path:
+        return self.home_dir / "claude-playlists.xml"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -86,6 +94,8 @@ class Config:
             cfg.backup_dir = Path(env["REKORDBOX_MCP_BACKUP_DIR"]).expanduser()
         if env.get("REKORDBOX_MCP_DOWNLOADS_DIR"):
             cfg.downloads_dir = Path(env["REKORDBOX_MCP_DOWNLOADS_DIR"]).expanduser()
+        if env.get("REKORDBOX_MCP_HOME"):
+            cfg.home_dir = Path(env["REKORDBOX_MCP_HOME"]).expanduser()
         cfg.unlock = env.get("REKORDBOX_DB_UNLOCK", "1") != "0"
         return cfg
 
@@ -114,6 +124,8 @@ def _default_downloads_dir() -> Path | None:
 class Library:
     def __init__(self, config: Config | None = None):
         self.config = config or Config.from_env()
+        self.pending = PendingQueue(self.config.home_dir / "pending-changes.json")
+        self._lock = threading.RLock()
 
     # -- connection -----------------------------------------------------------------
 
@@ -146,20 +158,21 @@ class Library:
     @contextmanager
     def write(self) -> Iterator[tuple[Rekordbox6Database, Path]]:
         """Open for writing: refuses while Rekordbox runs, backs up first, commits on success."""
-        if rekordbox_running():
-            raise LibraryError(
-                "Rekordbox is open. Quit Rekordbox first so changes can be saved safely, then ask again."
-            )
-        backup = self.backup()
-        db = self._open()
-        try:
-            yield db, backup
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        with self._lock:
+            if rekordbox_running():
+                raise LibraryError(
+                    "Rekordbox is open. Quit Rekordbox first so changes can be saved safely, then ask again."
+                )
+            backup = self.backup()
+            db = self._open()
+            try:
+                yield db, backup
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.close()
 
     def backup(self) -> Path:
         """Copy master.db (and masterPlaylists6.xml) into a timestamped backup folder."""
@@ -405,6 +418,8 @@ class Library:
 
     def create_playlist(self, name: str, track_ids: list[str], folder: str | None = None) -> dict:
         tracks = self.get_tracks(track_ids) if track_ids else []
+        if rekordbox_running():
+            return self._xml_playlist(name, tracks, folder=folder)
         with self.write() as (db, backup):
             parent = None
             if folder:
@@ -422,7 +437,15 @@ class Library:
         return result
 
     def add_to_playlist(self, playlist: str, track_ids: list[str], skip_existing: bool = True) -> dict:
-        self.get_tracks(track_ids)  # validates IDs
+        tracks = self.get_tracks(track_ids)  # validates IDs
+        if rekordbox_running():
+            with self.read() as db:
+                name = self._resolve_playlist(db, playlist).Name
+            result = self._xml_playlist(f"{name} (add these)", tracks)
+            result["next_step"] += (
+                f" Then select all tracks in it and drag them onto your '{name}' playlist."
+            )
+            return result
         with self.write() as (db, backup):
             pl = self._resolve_playlist(db, playlist)
             if _as_int(pl.Attribute) != 0:
@@ -472,60 +495,96 @@ class Library:
         remove_my_tags: list[str] | None = None,
         dry_run: bool = False,
     ) -> dict:
+        """Edit tracks now, or queue the edit until Rekordbox is closed if it's running."""
+        edit = {
+            "track_ids": [str(t) for t in track_ids], "genre": genre, "comment": comment,
+            "append_comment": append_comment, "rating": rating, "color": color,
+            "add_my_tags": add_my_tags or [], "remove_my_tags": remove_my_tags or [],
+        }
         if rating is not None and not 0 <= rating <= 5:
             raise LibraryError("Rating must be 0-5 stars.")
-        before = self.get_tracks(track_ids)
-        changes = []
-        for t in before:
-            change = {"id": t["id"], "track": f"{t['artist'] or '?'} - {t['title']}"}
-            if genre is not None and genre != t["genre"]:
-                change["genre"] = [t["genre"], genre]
-            if comment is not None or append_comment:
-                new = comment if comment is not None else (t["comment"] or "")
-                if append_comment and append_comment not in new:
-                    new = f"{new} {append_comment}".strip()
-                if new != (t["comment"] or ""):
-                    change["comment"] = [t["comment"], new]
-            if rating is not None and rating != t["rating"]:
-                change["rating"] = [t["rating"], rating]
-            if color is not None and (color or None) != t["color"]:
-                change["color"] = [t["color"], color or None]
-            add = [m for m in (add_my_tags or []) if m not in t["my_tags"]]
-            rem = [m for m in (remove_my_tags or []) if m in t["my_tags"]]
-            if add:
-                change["add_my_tags"] = add
-            if rem:
-                change["remove_my_tags"] = rem
-            if len(change) > 2:
-                changes.append(change)
-
-        summary = {"tracks_checked": len(before), "tracks_changing": len(changes), "changes": changes}
+        with self.read() as db:
+            self._validate_edit(db, edit)
+            tracks = self._load_tracks(db)
+        changes = _plan_edit(tracks, edit)
+        summary = {"tracks_checked": len(edit["track_ids"]), "tracks_changing": len(changes), "changes": changes}
         if dry_run or not changes:
             summary["applied"] = False
             return summary
-
+        if rekordbox_running():
+            summary["applied"] = False
+            summary["queued"] = self.pending.add("update_tracks", edit, len(changes))
+            summary["next_step"] = (
+                "Rekordbox is open, so this edit is queued. It's applied automatically as soon as "
+                "you quit Rekordbox, and shows up the next time you open it."
+            )
+            return summary
         with self.write() as (db, backup):
-            genre_id = self._genre_id(db, genre) if genre else None
-            color_id = self._color_id(db, color) if color else None
-            tag_ids = self._my_tag_ids(db, (add_my_tags or []) + (remove_my_tags or []))
-            for change in changes:
-                c = db.get_content(ID=change["id"])
-                if "genre" in change:
-                    c.GenreID = genre_id
-                if "comment" in change:
-                    c.Commnt = change["comment"][1]
-                if "rating" in change:
-                    c.Rating = rating
-                if "color" in change:
-                    c.ColorID = color_id
-                for tag in change.get("add_my_tags", []):
-                    self._add_my_tag(db, c.ID, tag_ids[tag])
-                for tag in change.get("remove_my_tags", []):
-                    for link in db.query(tables.DjmdSongMyTag).filter_by(ContentID=str(c.ID), MyTagID=tag_ids[tag]):
-                        db.delete(link)
+            self._apply_edit(db, edit, _plan_edit(self._load_tracks(db), edit))
         summary["applied"] = True
         summary["backup"] = str(backup)
         return summary
+
+    def _validate_edit(self, db: Rekordbox6Database, edit: dict) -> None:
+        known = {str(c.ID) for c in self._contents(db)}
+        missing = [t for t in edit["track_ids"] if t not in known]
+        if missing:
+            raise LibraryError(f"No tracks with these IDs: {', '.join(missing)}")
+        if edit["color"]:
+            self._color_id(db, edit["color"])
+        self._my_tag_ids(db, edit["add_my_tags"] + edit["remove_my_tags"])
+
+    def _apply_edit(self, db: Rekordbox6Database, edit: dict, changes: list[dict]) -> None:
+        genre_id = self._genre_id(db, edit["genre"]) if edit["genre"] else None
+        color_id = self._color_id(db, edit["color"]) if edit["color"] else None
+        tag_ids = self._my_tag_ids(db, edit["add_my_tags"] + edit["remove_my_tags"])
+        for change in changes:
+            c = db.get_content(ID=change["id"])
+            if "genre" in change:
+                c.GenreID = genre_id
+            if "comment" in change:
+                c.Commnt = change["comment"][1]
+            if "rating" in change:
+                c.Rating = edit["rating"]
+            if "color" in change:
+                c.ColorID = color_id
+            for tag in change.get("add_my_tags", []):
+                self._add_my_tag(db, c.ID, tag_ids[tag])
+            for tag in change.get("remove_my_tags", []):
+                for link in db.query(tables.DjmdSongMyTag).filter_by(ContentID=str(c.ID), MyTagID=tag_ids[tag]):
+                    db.delete(link)
+
+    # -- changes made while Rekordbox is open ----------------------------------------
+
+    def apply_pending(self) -> dict | None:
+        """Apply queued edits. Returns None when there's nothing to do or Rekordbox is open."""
+        items = self.pending.items()
+        if not items or rekordbox_running():
+            return None
+        results = []
+        with self.write() as (db, backup):
+            for item in items:
+                try:
+                    self._validate_edit(db, item["args"])
+                except LibraryError as exc:  # e.g. a tag deleted since; don't block the other edits
+                    results.append({"id": item["id"], "applied": False, "error": str(exc)})
+                    continue
+                changes = _plan_edit(self._load_tracks(db), item["args"])
+                self._apply_edit(db, item["args"], changes)
+                db.flush()
+                results.append({"id": item["id"], "applied": True, "tracks_changed": len(changes)})
+        self.pending.finish([r["id"] for r in results], results, str(backup))
+        return {"results": results, "backup": str(backup)}
+
+    def _xml_playlist(self, name: str, tracks: list[dict], folder: str | None = None) -> dict:
+        path = xmlbridge.add_playlist(self.config.xml_path, name, tracks, folder=folder)
+        return {
+            "mode": "rekordbox_xml",
+            "playlist": name,
+            "tracks": len(tracks),
+            "xml_file": str(path),
+            "next_step": xmlbridge.HOW_TO_LOAD.format(path=path, name=name),
+        }
 
     @staticmethod
     def _genre_id(db: Rekordbox6Database, name: str) -> str:
@@ -761,6 +820,15 @@ class Library:
                 "These can't be added directly (drag them into Rekordbox instead, or rename .aif to "
                 f".aiff): {', '.join(unsupported)}"
             )
+        if rekordbox_running():
+            with self.read() as db:
+                known = {_nfc(c.FolderPath or "") for c in db.query(tables.DjmdContent)}
+            new = [p for p in paths if _nfc(str(p)) not in known]
+            tracks = [dict(read_file_tags(p), id=None) for p in new]
+            result = self._xml_playlist(playlist or "New Imports", tracks)
+            result["skipped_already_in_library"] = [str(p) for p in paths if p not in new]
+            result["next_step"] += " Importing the playlist also adds the tracks to your Collection; then analyze them."
+            return result
         with self.write() as (db, backup):
             known = {_nfc(c.FolderPath or "") for c in db.query(tables.DjmdContent)}
             pl = self._resolve_or_create_playlist(db, playlist) if playlist else None
@@ -840,6 +908,38 @@ class Library:
             "artists": [{"artist": a, "links": discovery.artist_links(a)} for a, _ in artist_score.most_common(artists)],
             "genres": [{"genre": g, "links": discovery.genre_links(g)} for g, _ in genre_score.most_common(genres)],
         }
+
+
+def _plan_edit(tracks: list[dict], edit: dict) -> list[dict]:
+    """Work out what an edit changes per track, as {field: [old, new]}."""
+    by_id = {t["id"]: t for t in tracks}
+    changes = []
+    for tid in edit["track_ids"]:
+        t = by_id.get(tid)
+        if t is None:
+            continue
+        change = {"id": t["id"], "track": f"{t['artist'] or '?'} - {t['title']}"}
+        if edit["genre"] is not None and edit["genre"] != t["genre"]:
+            change["genre"] = [t["genre"], edit["genre"]]
+        if edit["comment"] is not None or edit["append_comment"]:
+            new = edit["comment"] if edit["comment"] is not None else (t["comment"] or "")
+            if edit["append_comment"] and edit["append_comment"] not in new:
+                new = f"{new} {edit['append_comment']}".strip()
+            if new != (t["comment"] or ""):
+                change["comment"] = [t["comment"], new]
+        if edit["rating"] is not None and edit["rating"] != t["rating"]:
+            change["rating"] = [t["rating"], edit["rating"]]
+        if edit["color"] is not None and (edit["color"] or None) != t["color"]:
+            change["color"] = [t["color"], edit["color"] or None]
+        add = [m for m in edit["add_my_tags"] if m.lower() not in [x.lower() for x in t["my_tags"]]]
+        rem = [m for m in edit["remove_my_tags"] if m.lower() in [x.lower() for x in t["my_tags"]]]
+        if add:
+            change["add_my_tags"] = add
+        if rem:
+            change["remove_my_tags"] = rem
+        if len(change) > 2:
+            changes.append(change)
+    return changes
 
 
 def _brief(t: dict, *extra: str) -> dict:

@@ -110,6 +110,6 @@ def rb(tmp_path: Path, monkeypatch) -> Library:
     monkeypatch.setattr(library_mod, "get_rekordbox_pid", lambda: 0)
     monkeypatch.setattr("pyrekordbox.db6.database.get_rekordbox_pid", lambda *a, **k: 0)
     cfg = Config(db_path=db_path, backup_dir=tmp_path / "backups", downloads_dir=tmp_path / "New Downloads",
-                 unlock=False)
+                 unlock=False, home_dir=tmp_path / "rekordbox-mcp")
     cfg.downloads_dir.mkdir()
     return Library(cfg)

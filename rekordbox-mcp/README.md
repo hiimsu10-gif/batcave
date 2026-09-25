@@ -28,10 +28,34 @@ reads and edits Rekordbox's own database (`master.db`) on your Mac through
 - *(with the Spotify connector)* "Check my Spotify playlist *Summer Finds* against Rekordbox and tell me what I'm missing." Missing tracks come back with Bandcamp, Beatport and SoundCloud links so you can buy them or grab free downloads.
 - "Based on what I play most, which artists and genres should I check on Bandcamp and SoundCloud for new releases?"
 
+## Making changes while Rekordbox is open
+
+Rekordbox keeps the library in memory while it runs and overwrites the database when it saves.
+Writing into `master.db` behind its back gets lost or corrupts the library, so the connector
+works around that instead:
+
+| What you ask for | Rekordbox closed | Rekordbox open |
+|---|---|---|
+| Search, stats, cleanup reports | Works | Works |
+| New playlist / saved set / imports | Written into the library | Shows up under **rekordbox xml → Claude** in the sidebar. Right-click it and choose **Import Playlist** |
+| Add tracks to an existing playlist | Written into the library | Arrives as "*name* (add these)" under rekordbox xml. Drag its tracks onto your playlist |
+| Genre, rating, color, comments, My Tags | Written into the library | **Queued** and applied automatically about 30 seconds after you quit Rekordbox. They're there the next time you open it |
+
+Ask *"what changes are pending?"* to see the queue, or *"cancel the pending changes"* to drop it.
+The queue only runs while Claude Desktop is open. If you quit both, the queued edits are
+applied the next time Claude Desktop starts with Rekordbox closed.
+
+**One-time setup for the XML part** (Rekordbox 6/7):
+1. **Preferences → Advanced → Database → rekordbox xml → Imported Library:** choose
+   `~/Documents/rekordbox-mcp/claude-playlists.xml`. It's created the first time Claude makes a
+   playlist while Rekordbox is open, so ask for one first.
+2. **Preferences → View → Layout:** tick **rekordbox xml** so it appears in the left sidebar.
+3. After Claude makes a playlist, click the refresh icon next to **rekordbox xml** to see it.
+
 ## Safety
 
 - **Reading is safe anytime**, even with Rekordbox open.
-- **Changes only happen while Rekordbox is closed.** If it's open, Claude will ask you to quit it first.
+- **Direct changes to the library only happen while Rekordbox is closed.** See above for what happens while it's open.
 - **Every change makes a backup first** in `~/Documents/rekordbox-mcp-backups/<date-time>/`, holding
   `master.db` and `masterPlaylists6.xml`. The last 30 backups are kept.
   To undo a change: quit Rekordbox and copy both files from a backup back into `~/Library/Pioneer/rekordbox/`.
@@ -94,12 +118,16 @@ If the file already has an `mcpServers` section, add the `"rekordbox": {...}` bl
 | `REKORDBOX_MCP_DOWNLOADS_DIR` | Folder to scan for new downloads | `~/Library/CloudStorage/Dropbox/New Downloads`, then `~/Dropbox/New Downloads` |
 | `REKORDBOX_DB_PATH` | Location of `master.db` | Found automatically |
 | `REKORDBOX_MCP_BACKUP_DIR` | Where backups go | `~/Documents/rekordbox-mcp-backups` |
+| `REKORDBOX_MCP_HOME` | Where the edit queue and `claude-playlists.xml` live | `~/Documents/rekordbox-mcp` |
 
 ## Troubleshooting
 
 - **The server doesn't show up in Claude:** check the JSON for typos (a missing comma is the usual
   cause), and make sure `command` is the full path to `uv`. See Claude's logs in `~/Library/Logs/Claude/`.
-- **"Rekordbox is open":** quit Rekordbox fully (⌘Q) and ask again.
+- **Queued edits haven't applied:** make sure Rekordbox is fully quit (⌘Q, not just the window
+  closed) and Claude Desktop is open. Then ask *"what changes are pending?"*.
+- **Imported XML playlist shows tracks as missing:** the file moved after the playlist was made.
+  Ask Claude to make the playlist again.
 - **macOS asks for access to Dropbox or Documents:** allow it. Claude Desktop needs that to scan your downloads folder.
 - **Scanning downloads is slow:** Dropbox "online-only" files get downloaded when they're scanned.
   Right-click the folder in Finder and choose **Make available offline**.
@@ -115,6 +143,7 @@ If the file already has an `mcpServers` section, add the `"rekordbox": {...}` bl
 | Tagging | `list_my_tags`, `update_tracks` |
 | Cleanup | `find_duplicates`, `find_missing_files`, `find_incomplete_tracks`, `find_unplayed_tracks`, `find_tracks_without_cues` |
 | History | `play_history`, `most_played` |
+| While Rekordbox is open | `pending_changes`, `cancel_pending_changes` |
 | New music | `scan_new_downloads`, `import_tracks`, `match_tracks`, `find_on_stores`, `discover_new_music` |
 
 ## Development

@@ -69,11 +69,96 @@ def test_update_tracks_dry_run_then_apply(rb):
         rb.update_tracks(["103"], add_my_tags=["Nope"])
 
 
-def test_writes_refused_while_rekordbox_open(rb, monkeypatch):
-    monkeypatch.setattr(library_mod, "get_rekordbox_pid", lambda: 1234)
+@pytest.fixture()
+def rekordbox_open(monkeypatch):
+    state = {"running": True}
+    monkeypatch.setattr(library_mod, "get_rekordbox_pid", lambda: 1234 if state["running"] else 0)
+    return state
+
+
+def _xml_playlist(rb, *names):
+    from pyrekordbox.rbxml import RekordboxXml
+
+    xml = RekordboxXml(rb.config.xml_path)
+    node = xml.get_playlist("Claude", *names)
+    by_id = {int(t["TrackID"]): t for t in xml.get_tracks()}
+    return [by_id[k] for k in node.get_tracks()]
+
+
+def test_direct_writes_refused_while_rekordbox_open(rb, rekordbox_open):
     with pytest.raises(LibraryError, match="Quit Rekordbox"):
-        rb.create_playlist("X", ["101"])
+        with rb.write():
+            pass
     assert not rb.config.backup_dir.exists()
+
+
+def test_playlist_via_xml_while_open(rb, rekordbox_open):
+    res = rb.create_playlist("Peak Time", ["106", "103"], folder="Gigs")
+    assert res["mode"] == "rekordbox_xml" and "Import Playlist" in res["next_step"]
+    tracks = _xml_playlist(rb, "Gigs", "Peak Time")
+    assert [t["Name"] for t in tracks] == ["Warehouse", "Night Drive"]
+    raw = rb.config.xml_path.read_text()
+    assert 'Location="file://localhost/tmp/' in raw and "localhost//" not in raw
+    assert "Gamma%20-%20Warehouse.mp3" in raw
+    # recreating replaces it, other playlists and shared tracks are kept
+    rb.create_playlist("Peak Time", ["101"], folder="Gigs")
+    rb.create_playlist("Other", ["106"])
+    assert [t["Name"] for t in _xml_playlist(rb, "Gigs", "Peak Time")] == ["Sunrise"]
+    assert [t["Name"] for t in _xml_playlist(rb, "Other")] == ["Warehouse"]
+    res = rb.add_to_playlist("Warmup", ["106"])
+    assert [t["Name"] for t in _xml_playlist(rb, "Warmup (add these)")] == ["Warehouse"]
+    assert "drag" in res["next_step"]
+    assert rb.playlist_tracks("Warmup")["track_count"] == 2  # library untouched
+    assert not rb.config.backup_dir.exists()
+
+
+def test_import_via_xml_while_open(rb, rekordbox_open):
+    inbox = rb.config.downloads_dir
+    (inbox / "Zeta - Fresh Cut.mp3").write_bytes(b"\0" * 100)
+    known = rb.track_details("101")["file_path"]
+    res = rb.import_files([str(inbox / "Zeta - Fresh Cut.mp3"), known], playlist="New This Week")
+    assert res["skipped_already_in_library"] == [known]
+    assert [(t["Artist"], t["Name"]) for t in _xml_playlist(rb, "New This Week")] == [("Zeta", "Fresh Cut")]
+
+
+def test_edits_queue_while_open_and_apply_after_quit(rb, rekordbox_open):
+    res = rb.update_tracks(["103", "105"], rating=5, add_my_tags=["Uplifting"])
+    assert res["applied"] is False and res["queued"]["position"] == 1
+    second = rb.update_tracks(["101"], genre="Garage")
+    assert rb.track_details("105")["rating"] == 0  # nothing written yet
+    with pytest.raises(LibraryError, match="don't exist"):  # bad edits rejected up front, not queued
+        rb.update_tracks(["101"], add_my_tags=["Nope"])
+    assert len(rb.pending.items()) == 2
+
+    assert rb.apply_pending() is None  # still open
+    rekordbox_open["running"] = False
+    applied = rb.apply_pending()
+    assert [r["applied"] for r in applied["results"]] == [True, True]
+    assert rb.track_details("105")["rating"] == 5 and rb.track_details("103")["my_tags"] == ["Dark", "Uplifting"]
+    assert rb.track_details("101")["genre"] == "Garage"
+    assert rb.pending.items() == [] and len(rb.pending.history()) == 2
+    assert len(list(rb.config.backup_dir.iterdir())) == 1  # one backup for the whole batch
+    assert second["queued"]["id"] in {h["id"] for h in rb.pending.history()}
+
+
+def test_queued_edit_that_became_invalid_is_skipped(rb, rekordbox_open):
+    rb.update_tracks(["101"], add_my_tags=["Uplifting"])
+    rb.update_tracks(["102"], rating=1)
+    # simulate the tag being deleted in Rekordbox before it was closed
+    items = rb.pending.items()
+    items[0]["args"]["add_my_tags"] = ["Deleted Tag"]
+    rb.pending._save({"pending": items, "history": []})
+    rekordbox_open["running"] = False
+    results = rb.apply_pending()["results"]
+    assert [r["applied"] for r in results] == [False, True] and "Deleted Tag" in results[0]["error"]
+    assert rb.track_details("102")["rating"] == 1
+
+
+def test_cancel_pending(rb, rekordbox_open):
+    a = rb.update_tracks(["101"], rating=1)["queued"]["id"]
+    rb.update_tracks(["102"], rating=1)
+    assert rb.pending.cancel(a) == 1 and len(rb.pending.items()) == 1
+    assert rb.pending.cancel() == 1 and rb.pending.items() == []
 
 
 def test_cleanup(rb):

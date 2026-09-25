@@ -13,9 +13,13 @@ INSTRUCTIONS = """\
 Tools for the user's Rekordbox DJ library (tracks, playlists, tags, play history).
 
 - Track IDs come from search results; always pass IDs, not titles, to tools that change things.
-- Tools that change the library only work while Rekordbox is closed. Each change backs up
-  master.db first and returns the backup folder. Before bulk edits (update_tracks on many
-  tracks), run with dry_run=true, show the user the changes and ask for a go-ahead.
+- Changes work whether or not Rekordbox is open:
+  - Rekordbox closed: written straight into the library, after backing up master.db.
+  - Rekordbox open: playlists and imports go into an XML file Rekordbox loads live (relay the
+    returned next_step to the user); track edits are queued and applied automatically the
+    moment Rekordbox is quit. pending_changes shows the queue.
+- Before bulk edits (update_tracks on many tracks), run with dry_run=true, show the user the
+  changes and ask for a go-ahead.
 - Keys are reported in Camelot notation (8A, 9B...). BPM ramps and +/-1 Camelot moves make
   smooth sets.
 - For tracks the user doesn't own, point them to the Bandcamp / Beatport / SoundCloud links
@@ -47,6 +51,9 @@ def library_status() -> dict:
             "database": str(lib.db_path),
             "rekordbox_running": rekordbox_running(),
             "backups_folder": str(lib.config.backup_dir),
+            "edits_while_open": "playlists via rekordbox xml, track edits queued until Rekordbox quits",
+            "queued_edits": len(lib.pending.items()),
+            "rekordbox_xml_file": str(lib.config.xml_path),
             "downloads_folder": str(lib.config.downloads_dir) if lib.config.downloads_dir else "auto-detect",
         }
     return _run(status)
@@ -126,13 +133,14 @@ def get_playlist(playlist: str) -> dict:
 @mcp.tool(annotations=WRITE)
 def create_playlist(name: str, track_ids: list[str], folder: str | None = None) -> dict:
     """Create a playlist with these tracks, in this order. `folder` is created if it doesn't exist.
-    Requires Rekordbox to be closed; backs up the library first."""
+    If Rekordbox is open, the playlist is delivered via rekordbox xml (see next_step in the result)."""
     return _run(lib.create_playlist, name, track_ids, folder=folder)
 
 
 @mcp.tool(annotations=WRITE)
 def add_to_playlist(playlist: str, track_ids: list[str], skip_existing: bool = True) -> dict:
-    """Append tracks to an existing playlist. Requires Rekordbox to be closed; backs up first."""
+    """Append tracks to an existing playlist. If Rekordbox is open, the tracks are delivered as an
+    XML playlist to drag in (see next_step)."""
     return _run(lib.add_to_playlist, playlist, track_ids, skip_existing=skip_existing)
 
 
@@ -160,7 +168,7 @@ def build_set(
 
     Candidates come from the library filtered by genre / my_tag / playlist / BPM / rating.
     skip_played_within_days leaves out tracks played recently. If save_as_playlist is given
-    the set is saved as a new playlist (Rekordbox must be closed); otherwise it's a preview.
+    the set is saved as a new playlist; otherwise it's a preview.
     """
     def run():
         import datetime as dt
@@ -211,8 +219,8 @@ def update_tracks(
     """Edit tracks: genre, comment (replace, or append_comment to add text), rating 0-5,
     color (a name from list_my_tags; "" clears it), and My Tags (must already exist).
 
-    Use dry_run=true to preview exactly what would change. Requires Rekordbox to be closed
-    when applying; backs up the library first.
+    Use dry_run=true to preview exactly what would change. If Rekordbox is open the edit is
+    queued and applied automatically as soon as Rekordbox is quit.
     """
     return _run(
         lib.update_tracks, track_ids, genre=genre, comment=comment, append_comment=append_comment,
@@ -282,7 +290,8 @@ def scan_new_downloads(folder: str | None = None, limit: int = 200) -> dict:
 @mcp.tool(annotations=WRITE)
 def import_tracks(file_paths: list[str], playlist: str | None = None) -> dict:
     """Add audio files to the Rekordbox collection, optionally into a playlist (created if needed).
-    Rekordbox must be closed. Afterwards the tracks need analyzing in Rekordbox for BPM/key."""
+    If Rekordbox is open they're delivered as an XML playlist to import. Afterwards the tracks
+    need analyzing in Rekordbox for BPM/key."""
     return _run(lib.import_files, file_paths, playlist=playlist)
 
 
@@ -306,6 +315,31 @@ def discover_new_music(artists: int = 10, genres: int = 5, based_on: str = "play
     (based_on="plays") or added most recently (based_on="recent"), each with Bandcamp,
     SoundCloud and Beatport links to check for new releases."""
     return _run(lib.discovery_sources, artists=artists, genres=genres, based_on=based_on)
+
+
+@mcp.tool(annotations=READ)
+def pending_changes() -> dict:
+    """Track edits waiting for Rekordbox to close, and the results of recently applied ones."""
+    return _run(lambda: {
+        "rekordbox_running": rekordbox_running(),
+        "pending": [
+            {k: i[k] for k in ("id", "queued_at", "tracks_changing")} | {"edit": _describe(i["args"])}
+            for i in lib.pending.items()
+        ],
+        "recently_applied": lib.pending.history(),
+    })
+
+
+def _describe(args: dict) -> dict:
+    out = {k: v for k, v in args.items() if v not in (None, [], "") and k != "track_ids"}
+    out["tracks"] = len(args["track_ids"])
+    return out
+
+
+@mcp.tool(annotations=WRITE)
+def cancel_pending_changes(change_id: str | None = None) -> dict:
+    """Cancel one queued edit by id, or all of them if no id is given."""
+    return {"cancelled": lib.pending.cancel(change_id)}
 
 
 @mcp.tool(annotations=WRITE)
@@ -332,11 +366,34 @@ def check() -> int:
     return 0
 
 
+def watch_for_rekordbox_quit(interval: float = 15.0, stop=None) -> None:
+    """Apply queued edits once Rekordbox has been closed for two checks in a row."""
+    import sys
+    import threading
+
+    stop = stop or threading.Event()
+    closed_checks = 0
+    while not stop.wait(interval):
+        try:
+            if not lib.pending.items():
+                continue
+            closed_checks = 0 if rekordbox_running() else closed_checks + 1
+            if closed_checks >= 2:  # give Rekordbox a moment to finish saving on quit
+                result = lib.apply_pending()
+                if result:
+                    print(f"rekordbox-mcp: applied queued edits: {result}", file=sys.stderr)
+                closed_checks = 0
+        except Exception as exc:  # keep watching; the error is visible in Claude's MCP log
+            print(f"rekordbox-mcp: couldn't apply queued edits: {exc}", file=sys.stderr)
+
+
 def main() -> None:
     import sys
+    import threading
 
     if "--check" in sys.argv[1:]:
         raise SystemExit(check())
+    threading.Thread(target=watch_for_rekordbox_quit, daemon=True, name="pending-edits").start()
     mcp.run("stdio")
 
 
