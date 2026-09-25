@@ -63,31 +63,27 @@ applied the next time Claude Desktop starts with Rekordbox closed.
 - Tracks it imports show up in Rekordbox **unanalyzed**. Select them and choose **Analyze Track**
   to get BPM, key and waveforms.
 
-## Setup (Mac, about 10 minutes)
+## Setup (Mac)
 
-**1. Install `uv`** (it runs Python apps). Open Terminal and paste:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Close Terminal, open a new one, and run `which uv`. Note the path it prints, e.g. `/Users/su/.local/bin/uv`.
-
-**2. Get this code** onto your Mac, e.g. into your home folder:
+Open **Terminal**, paste this line and press Return:
 
 ```bash
-git clone https://github.com/hiimsu10-gif/batcave.git ~/batcave
+curl -fsSL https://raw.githubusercontent.com/hiimsu10-gif/batcave/claude/festive-pascal-yrjn69/rekordbox-mcp/install.sh | bash
 ```
 
-(Or download the repo as a ZIP from GitHub and unzip it to `~/batcave`.)
+It installs `uv` if needed, downloads the connector to `~/rekordbox-mcp`, checks that it can
+open your Rekordbox library, finds your Dropbox *New Downloads* folder, and adds the connector
+to Claude Desktop (backing up your Claude settings first). Then quit Claude Desktop with ⌘Q and
+reopen it. Run the same line again any time to update.
 
-**3. Test it:**
+### Manual setup (if you'd rather do it by hand)
 
-```bash
-cd ~/batcave/rekordbox-mcp && uv run rekordbox-mcp --check
-```
+**1. Install `uv`:** `curl -LsSf https://astral.sh/uv/install.sh | sh`, then run `which uv` in a new
+Terminal window and note the path.
 
-You should see your track and playlist counts. The first run takes a minute while it installs.
+**2. Get the code:** `git clone -b claude/festive-pascal-yrjn69 https://github.com/hiimsu10-gif/batcave.git ~/batcave`
+
+**3. Test it:** `cd ~/batcave/rekordbox-mcp && uv run rekordbox-mcp --check`
 
 **4. Add it to Claude Desktop.** In Claude Desktop, open **Settings → Developer → Edit Config**.
 That opens `~/Library/Application Support/Claude/claude_desktop_config.json`. Add a
