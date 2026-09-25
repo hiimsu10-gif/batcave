@@ -35,12 +35,19 @@ def norm(text):
 
 
 def key_words(track):
-    """Distinctive words from a set-list title, ignoring features, remix tags and notes."""
-    title = track.split(" – ", 1)[-1]
+    """(artist words, title words) from a set-list row, ignoring features, remix tags and notes."""
+    artist, _, title = track.rpartition(" – ")
     title = re.sub(r"\*.*?\*|⚠️", "", title)
     core = re.sub(r"\(.*?\)|\[.*?\]|\bft\..*|\bfeat\..*", "", title)
-    words = [w for w in norm(core).split() if len(w) > 2]
-    return words or norm(title).split()
+    words = [w for w in norm(core).split() if len(w) > 2] or norm(title).split()
+    artist = re.sub(r"\bft\..*|\bfeat\..*", "", artist)
+    artist_words = [w for w in norm(artist).split() if len(w) > 2]
+    return artist_words, words
+
+
+def matches(text, artist_words, words):
+    """All title words present, plus at least one artist word when the row names an artist."""
+    return all(w in text for w in words) and (not artist_words or any(w in text for w in artist_words))
 
 
 def read_setlists(folder):
@@ -115,32 +122,54 @@ def main():
     rb = load_rekordbox()
     files = index_library(args.library)
 
-    rows, counts = [], {"in rekordbox": 0, "not imported": 0, "on disk": 0, "online-only": 0, "missing": 0}
+    rank = {"on disk": 0, "online-only": 1, "missing": 2}
+    rows, counts = [], {"in rekordbox": 0, "not imported": 0, "on disk": 0, "online-only": 0, "missing": 0,
+                        "wrong path": 0, "duplicates": 0}
     for t in tracks:
-        words = key_words(t["track"])
-        hit = next((r for r in rb if all(w in r["text"] for w in words)), None)
-        path = hit["path"] if hit else next((p for name, p in files if all(w in name for w in words)), "")
+        artist_words, words = key_words(t["track"])
+        hits = sorted((r for r in rb if matches(r["text"], artist_words, words)),
+                      key=lambda r: rank[file_status(r["path"])])
+        hit = hits[0] if hits else None
+        dropbox = next((p for name, p in files if matches(name, artist_words, words)), "")
+        path = hit["path"] if hit else dropbox
         status = file_status(path)
+        if status == "missing" and hit and dropbox:
+            status, path = "wrong path", hit["path"]  # Rekordbox points elsewhere; Dropbox has the file
         if status == "online-only" and args.download:
             download(path)
             status = file_status(path)
         counts["in rekordbox" if hit else "not imported"] += 1
         counts[status] += 1
-        rows.append((t, hit, status, path))
+        counts["duplicates"] += len(hits) > 1
+        rows.append((t, hit, status, path, len(hits), dropbox))
 
     out = args.setlists / "ITR Rekordbox Check.md"
     lines = ["# ITR Rekordbox Check", "",
              f"{len(tracks)} tracks · in Rekordbox: {counts['in rekordbox']} · not imported: {counts['not imported']}"
-             f" · on disk: {counts['on disk']} · online-only: {counts['online-only']} · missing: {counts['missing']}", ""]
+             f" · on disk: {counts['on disk']} · online-only: {counts['online-only']}"
+             f" · wrong path (file is in Dropbox, Rekordbox looks elsewhere): {counts['wrong path']}"
+             f" · missing: {counts['missing']} · with duplicate Rekordbox entries: {counts['duplicates']}", ""]
+    folders = {}
+    for t, hit, status, path, n_hits, dropbox in rows:
+        if status == "wrong path":
+            folders[str(Path(path).parent.parent)] = folders.get(str(Path(path).parent.parent), 0) + 1
+    if folders:
+        lines += ["## Where Rekordbox is looking for the wrong-path tracks", ""]
+        lines += [f"- `{f}` ({n} tracks)" for f, n in sorted(folders.items(), key=lambda x: -x[1])]
     episode = None
-    for t, hit, status, path in rows:
+    for t, hit, status, path, n_hits, dropbox in rows:
         if t["ep"] != episode:
             episode = t["ep"]
-            lines += ["", f"## {episode}", "", "| # | Track | Rekordbox | Key | BPM | File |", "|---|---|---|---|---|---|"]
-        lines.append(f"| {t['n']} | {t['track']} | {'yes' if hit else '**not imported**'} | "
-                     f"{hit['key'] if hit else '—'} | {hit['bpm'] if hit else '—'} | {status} |")
+            lines += ["", f"## {episode}", "", "| # | Track | Rekordbox | Key | BPM | File | Rekordbox path |",
+                      "|---|---|---|---|---|---|---|"]
+        entry = "**not imported**" if not hit else ("yes" if n_hits == 1 else f"yes ({n_hits} entries)")
+        where = "" if status == "on disk" else f"`{path}`"
+        lines.append(f"| {t['n']} | {t['track']} | {entry} | "
+                     f"{hit['key'] if hit else '—'} | {hit['bpm'] if hit else '—'} | {status} | {where} |")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(lines[2])
+    if folders:
+        print("Rekordbox is looking in:", ", ".join(folders))
     print(f"Report: {out}")
 
 
